@@ -5,7 +5,10 @@ const { spawn } = require('child_process');
 const disableVersionCheck = process.argv.includes('--novercheck');
 const SERVER_VERSION = '1.9.2';
 
-const wss = new WebSocket.Server({host: '0.0.0.0', port: 25565 });
+const portArg = process.argv.filter(v => v.startsWith("--port:"))[0];
+const port = parseInt((portArg ?? ':25565').split(':')[1]);
+
+const wss = new WebSocket.Server({host: '0.0.0.0', port: portArg });
 
 // --- SERVER WORLD STATE ---
 // players: id -> {id, x, y, z, dim, username, mode, health, maxHealth, inventory: { type: count }, lastDamageTime: 0}

@@ -8,6 +8,7 @@ The game is relatively well-optimized and includes version compatibility checks 
 
 ## Server Startup Flags
 
-| Flag         | Description                       |
-|--------------|-----------------------------------|
-| --novercheck | Disables the client version check |
+| Flag           | Description                                        |
+|----------------|----------------------------------------------------|
+| --novercheck   | Disables the client version check                  |
+| --port:\<port> | Allows setting a custom port to bind the server on |
