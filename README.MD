@@ -1,7 +1,13 @@
 # AI JS Minecraft
-This repo will contain every version of AI JS Minecraft since 1.9.2.
-It will contain a curated list of some clients and servers from before then too.
+![Version 1.9.2](https://img.shields.io/badge/Version-1.9.2-3C8527)
 
-Curated means that some versions will be skipped.
+This is the official GitHub Repository for `AI Javascript Minecraft`, also known as **Voxel World** (though nobody calls it that).
+AI JS Minecraft is a primarily AI-generated clone of Minecraft that runs completely in your browser!
 
-This repo will contain up-to-date version history on versions 1.9.2+
+The game is relatively well-optimized and includes version compatibility checks since Version 1.9.2. This GitHub repo contains commits for older versions but this is the first officially supported release!
+
+## Server Startup Flags
+
+| Flag         | Description                       |
+|--------------|-----------------------------------|
+| --novercheck | Disables the client version check |
