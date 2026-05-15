@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel World - JS Minecraft Clone</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: white;
+            transform: translate(-50%, -50%);
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 20;
+        }
+        #hotbar {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+        .slot {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #555;
+            background-size: cover;
+            image-rendering: pixelated;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: transparent;
+            overflow: hidden;
+        }
+        .slot.active {
+            border-color: white;
+            transform: scale(1.1);
+        }
+        /* Special Styles for Item Icons */
+        #slot6::after { content: ''; width: 20px; height: 20px; background: radial-gradient(circle, black 30%, #e0d5a6 40%); border: 2px solid #555; }
+        #slot7::after { content: ''; width: 20px; height: 20px; background: #3c8; border-radius: 50%; border: 2px solid #153; }
+    </style>
+    <!-- Import Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    
+    <div id="ui">
+        <b>Voxel World</b><br>
+        WASD to Move | SPACE to Jump/Fly<br>
+        L-Click: Break | R-Click: Place/Use<br>
+        1-7: Select Item<br>
+        <span style="color: #aaa; font-size: 0.8em;">Build a 3x3 portal frame & fill with eyes!</span>
+    </div>
+
+    <div id="instructions">
+        <h1>Click to Play</h1>
+        <p>Lock pointer to look around</p>
+    </div>
+
+    <div id="hotbar">
+        <div class="slot active" id="slot1" style="background-color: #5c9e63;"></div>
+        <div class="slot" id="slot2" style="background-color: #795548;"></div>
+        <div class="slot" id="slot3" style="background-color: #808080;"></div>
+        <div class="slot" id="slot4" style="background-color: #5d4037;"></div>
+        <div class="slot" id="slot5" style="background-color: #2e7d32;"></div>
+        <div class="slot" id="slot6" style="background-color: #e0d5a6;"></div> <!-- Frame -->
+        <div class="slot" id="slot7" style="background-color: transparent;"></div> <!-- Eye -->
+    </div>
+
+    <script>
+        // --- GAME CONFIGURATION ---
+        const WORLD_SIZE = 20; // Size of the chunk (20x20 blocks)
+        const BLOCK_SIZE = 5;  // Visual size of blocks
+        
+        // --- ASSETS (Procedural Textures) ---
+        function createBlockTexture(color, type = 'standard', noiseFactor = 0.1) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Base color
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, 64, 64);
+            
+            // Add noise
+            for (let i = 0; i < 400; i++) {
+                const x = Math.random() * 64;
+                const y = Math.random() * 64;
+                const size = Math.random() * 4 + 1;
+                const alpha = Math.random() * noiseFactor;
+                ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = `rgba(255,255,255,${alpha/2})`;
+                ctx.fillRect(x, y, size, size);
+            }
+
+            // Specific Texture Logic
+            if (type === 'frame' || type === 'frame_filled') {
+                // Draw Frame Inner Circle
+                ctx.fillStyle = '#222';
+                ctx.beginPath();
+                ctx.arc(32, 32, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw Decoration
+                ctx.strokeStyle = '#555';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(10, 10, 44, 44);
+
+                if (type === 'frame_filled') {
+                    // Eye of Ender
+                    ctx.fillStyle = '#3c8'; // Greenish
+                    ctx.beginPath();
+                    ctx.arc(32, 32, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000'; // Pupil
+                    ctx.fillRect(30, 20, 4, 24);
+                }
+            } else if (type === 'end_stone') {
+                // Inverted noise effect mostly
+                ctx.fillStyle = 'rgba(200, 200, 150, 0.2)';
+                for(let k=0; k<50; k++) {
+                     ctx.fillRect(Math.random()*64, Math.random()*64, 10, 10);
+                }
+            }
+
+            // Add border/bevel effect
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0,0,64,64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter; // Pixelated look
+            return texture;
+        }
+
+        const materials = {
+            grass: new THREE.MeshLambertMaterial({ map: createBlockTexture('#5c9e63') }),
+            dirt: new THREE.MeshLambertMaterial({ map: createBlockTexture('#5d4037') }),
+            stone: new THREE.MeshLambertMaterial({ map: createBlockTexture('#808080') }),
+            wood: new THREE.MeshLambertMaterial({ map: createBlockTexture('#4e342e') }),
+            leaves: new THREE.MeshLambertMaterial({ map: createBlockTexture('#2e7d32', 0.2), transparent: true, opacity: 0.9 }),
+            // End Materials
+            end_frame: new THREE.MeshLambertMaterial({ map: createBlockTexture('#e0d5a6', 'frame') }),
+            end_frame_filled: new THREE.MeshLambertMaterial({ map: createBlockTexture('#e0d5a6', 'frame_filled') }),
+            end_stone: new THREE.MeshLambertMaterial({ map: createBlockTexture('#fcf8d2', 'end_stone') }),
+            obsidian: new THREE.MeshLambertMaterial({ color: 0x1a1a2e }),
+            portal: new THREE.MeshBasicMaterial({ color: 0x000000 }), // Pure black for now
+            // UI/Mobs
+            hover: new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, opacity: 0.5, transparent: true }),
+            zombieSkin: new THREE.MeshLambertMaterial({ color: 0x2E8B57 }),
+            zombieClothes: new THREE.MeshLambertMaterial({ color: 0x00008B }),
+            villagerSkin: new THREE.MeshLambertMaterial({ color: 0xD2B48C }),
+            villagerClothes: new THREE.MeshLambertMaterial({ color: 0x8B4513 })
+        };
+
+        const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'end_frame', 'eye_of_ender'];
+        let currentBlockType = 'grass';
+
+        // --- THREE.JS SETUP ---
+        const scene = new THREE.Scene();
+        // Background set dynamically based on dimension
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 200, 100);
+        scene.add(dirLight);
+
+        // --- DIMENSION SYSTEM ---
+        const dimensions = {
+            overworld: {
+                group: new THREE.Group(),
+                objects: [], // For collision
+                data: new Map(),
+                generated: true, // Generated on init
+                skyColor: 0x87CEEB,
+                fog: new THREE.Fog(0x87CEEB, 20, 200)
+            },
+            the_end: {
+                group: new THREE.Group(),
+                objects: [],
+                data: new Map(),
+                generated: false,
+                skyColor: 0x050505,
+                fog: new THREE.Fog(0x050505, 20, 150)
+            }
+        };
+
+        let currentDim = 'overworld';
+
+        // Helper to get current active data
+        function getActiveWorld() {
+            return dimensions[currentDim];
+        }
+
+        function switchDimension(newDim) {
+            if (newDim === currentDim) return;
+
+            // Remove current group
+            scene.remove(dimensions[currentDim].group);
+            
+            // Setup new dim
+            currentDim = newDim;
+            const world = dimensions[currentDim];
+
+            // Generate if first time
+            if (!world.generated) {
+                if (newDim === 'the_end') generateEndWorld();
+                world.generated = true;
+            }
+
+            // Add new group
+            scene.add(world.group);
+            scene.background = new THREE.Color(world.skyColor);
+            scene.fog = world.fog;
+
+            // Reset Player Position safely
+            yawObject.position.set(0, 50, 0);
+            velocity.set(0, 0, 0);
+        }
+
+        const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+        function getCoordsKey(x, y, z) {
+            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+        }
+
+        // Modified addBlock to use active dimension
+        function addBlock(x, y, z, type, specificDim = null) {
+            const world = specificDim ? dimensions[specificDim] : getActiveWorld();
+            
+            // Prevent duplicates
+            const key = getCoordsKey(x, y, z);
+            if (world.data.has(key)) return;
+
+            const material = materials[type];
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            
+            // Tag mesh with type for logic
+            mesh.userData.type = type;
+
+            world.group.add(mesh);
+            world.objects.push(mesh);
+            world.data.set(key, mesh);
+            return mesh;
+        }
+
+        function removeBlock(mesh) {
+            const world = getActiveWorld();
+            world.group.remove(mesh);
+            const index = world.objects.indexOf(mesh);
+            if (index > -1) world.objects.splice(index, 1);
+            world.data.delete(getCoordsKey(mesh.position.x, mesh.position.y, mesh.position.z));
+        }
+
+        // --- WORLD GENERATION ---
+
+        // Simple Noise function for terrain
+        function simpleNoise(x, z) {
+            const sinX = Math.sin(x * 0.1);
+            const cosZ = Math.cos(z * 0.1);
+            return Math.abs(sinX + cosZ) * 2; 
+        }
+
+        function generateOverworld() {
+            // Switch context temporarily if needed, but we assume init runs in overworld
+            for (let x = -WORLD_SIZE/2; x < WORLD_SIZE/2; x++) {
+                for (let z = -WORLD_SIZE/2; z < WORLD_SIZE/2; z++) {
+                    const xp = x * BLOCK_SIZE;
+                    const zp = z * BLOCK_SIZE;
+                    const yHeight = Math.floor(simpleNoise(x, z));
+                    
+                    addBlock(xp, yHeight * BLOCK_SIZE, zp, 'grass', 'overworld');
+                    for(let d=1; d<=2; d++) {
+                        addBlock(xp, (yHeight - d) * BLOCK_SIZE, zp, 'dirt', 'overworld');
+                    }
+
+                    if (x > -10 && x < 10 && z > -10 && z < 10) { 
+                        if (Math.random() > 0.96) {
+                            createTree(xp, (yHeight + 1) * BLOCK_SIZE, zp, 'overworld');
+                        }
+                    }
+
+                    if (Math.random() < 0.02) {
+                        const type = Math.random() > 0.6 ? 'zombie' : 'villager';
+                        spawnMob(xp, (yHeight + 2) * BLOCK_SIZE, zp, type, 'overworld');
+                    }
+                }
+            }
+        }
+
+        function generateEndWorld() {
+            // Generate Island
+            const size = 15;
+            for (let x = -size; x < size; x++) {
+                for (let z = -size; z < size; z++) {
+                    const dist = Math.sqrt(x*x + z*z);
+                    if (dist < size - Math.random() * 3) {
+                        const xp = x * BLOCK_SIZE;
+                        const zp = z * BLOCK_SIZE;
+                        addBlock(xp, 0, zp, 'end_stone', 'the_end');
+                        addBlock(xp, -BLOCK_SIZE, zp, 'end_stone', 'the_end');
+                    }
+                }
+            }
+
+            // Obsidian Pillars
+            const pillars = [[8, 8], [-8, -8], [8, -8], [-8, 8]];
+            pillars.forEach(coord => {
+                const h = 5 + Math.floor(Math.random() * 5);
+                for(let y=1; y<h; y++) {
+                    addBlock(coord[0] * BLOCK_SIZE, y * BLOCK_SIZE, coord[1] * BLOCK_SIZE, 'obsidian', 'the_end');
+                }
+            });
+        }
+
+        function createTree(x, y, z, dim) {
+            for(let i=0; i<4; i++) addBlock(x, y + (i*BLOCK_SIZE), z, 'wood', dim);
+            const topY = y + (4*BLOCK_SIZE);
+            for(let lx=-1; lx<=1; lx++) {
+                for(let lz=-1; lz<=1; lz++) {
+                    for(let ly=0; ly<=1; ly++) {
+                         if(lx===0 && lz===0 && ly===0) continue;
+                         addBlock(x + (lx*BLOCK_SIZE), topY + (ly*BLOCK_SIZE), z + (lz*BLOCK_SIZE), 'leaves', dim);
+                    }
+                }
+            }
+            addBlock(x, topY + (2*BLOCK_SIZE), z, 'leaves', dim);
+        }
+
+        // --- MOBS SYSTEM ---
+        
+        const mobs = []; 
+        function spawnMob(x, y, z, type, dim) {
+            if (!dim) dim = currentDim;
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            
+            const bodyW = 3, bodyH = 6, bodyD = 2;
+            const headSize = 2.5;
+            const skinMat = type === 'zombie' ? materials.zombieSkin : materials.villagerSkin;
+            const clothMat = type === 'zombie' ? materials.zombieClothes : materials.villagerClothes;
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), clothMat);
+            body.position.y = bodyH / 2;
+            group.add(body);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skinMat);
+            head.position.y = bodyH + (headSize / 2);
+            group.add(head);
+            
+            const armGeo = new THREE.BoxGeometry(1, 6, 1);
+            const armL = new THREE.Mesh(armGeo, skinMat);
+            armL.position.set(-2, 3, 0);
+            if (type === 'zombie') { armL.rotation.x = -Math.PI / 2; armL.position.set(-2, 5, 2); }
+            group.add(armL);
+
+            const armR = new THREE.Mesh(armGeo, skinMat);
+            armR.position.set(2, 3, 0);
+            if (type === 'zombie') { armR.rotation.x = -Math.PI / 2; armR.position.set(2, 5, 2); }
+            group.add(armR);
+
+            // Add to Dimension Group instead of Scene
+            dimensions[dim].group.add(group);
+
+            mobs.push({ mesh: group, type: type, velocity: new THREE.Vector3(0, 0, 0), isDead: false, dim: dim });
+        }
+
+        // --- INIT ---
+        generateOverworld();
+        scene.add(dimensions.overworld.group);
+        scene.background = new THREE.Color(dimensions.overworld.skyColor);
+
+
+        // --- PLAYER CONTROLS ---
+        const yawObject = new THREE.Object3D();
+        yawObject.position.y = 30;
+        const pitchObject = new THREE.Object3D();
+        pitchObject.add(camera);
+        yawObject.add(pitchObject);
+        scene.add(yawObject);
+
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let moveUp = false, moveDown = false;
+        let canJump = false, isFlying = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+
+        const controls = { isLocked: false };
+
+        // Event Listeners
+        const instructions = document.getElementById('instructions');
+        instructions.addEventListener('click', () => document.body.requestPointerLock());
+        document.addEventListener('pointerlockchange', () => {
+            controls.isLocked = (document.pointerLockElement === document.body);
+            instructions.style.display = controls.isLocked ? 'none' : 'block';
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (!controls.isLocked) return;
+            yawObject.rotation.y -= event.movementX * 0.002;
+            pitchObject.rotation.x -= event.movementY * 0.002;
+            pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
+        });
+
+        let lastSpaceTime = 0;
+        document.addEventListener('keydown', (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Space': 
+                    if (!moveUp) {
+                        const now = performance.now();
+                        if (now - lastSpaceTime < 300) { isFlying = !isFlying; velocity.y = 0; }
+                        lastSpaceTime = now;
+                    }
+                    moveUp = true;
+                    if (!isFlying && canJump) { velocity.y += 150; canJump = false; }
+                    break;
+                case 'ShiftLeft': moveDown = true; break;
+                case 'Digit1': selectBlock(0); break;
+                case 'Digit2': selectBlock(1); break;
+                case 'Digit3': selectBlock(2); break;
+                case 'Digit4': selectBlock(3); break;
+                case 'Digit5': selectBlock(4); break;
+                case 'Digit6': selectBlock(5); break;
+                case 'Digit7': selectBlock(6); break;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+                case 'Space': moveUp = false; break;
+                case 'ShiftLeft': moveDown = false; break;
+            }
+        });
+
+        function selectBlock(index) {
+            currentBlockType = blockTypes[index];
+            document.querySelectorAll('.slot').forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+            });
+        }
+
+        // --- PORTAL LOGIC (Fixed) ---
+        function checkPortal(originX, originY, originZ) {
+            const world = getActiveWorld();
+            
+            // Instead of guessing one center, we scan a 5x5 area around the placed block
+            // to see if ANY valid portal center exists near it.
+            // This allows you to complete the portal from any block (corner, edge, etc.)
+            
+            // Search area relative to placed block
+            for (let cx = originX - 3*BLOCK_SIZE; cx <= originX + 3*BLOCK_SIZE; cx += BLOCK_SIZE) {
+                for (let cz = originZ - 3*BLOCK_SIZE; cz <= originZ + 3*BLOCK_SIZE; cz += BLOCK_SIZE) {
+                    
+                    // Assume (cx, originY, cz) is the CENTER of the 3x3 portal
+                    // We check if the 12 frames around it are filled
+                    
+                    let isComplete = true;
+                    
+                    // Check 12 frame positions
+                    const requiredOffsets = [
+                        // North (z-2)
+                        {x:-1, z:-2}, {x:0, z:-2}, {x:1, z:-2},
+                        // South (z+2)
+                        {x:-1, z:2}, {x:0, z:2}, {x:1, z:2},
+                        // West (x-2)
+                        {x:-2, z:-1}, {x:-2, z:0}, {x:-2, z:1},
+                        // East (x+2)
+                        {x:2, z:-1}, {x:2, z:0}, {x:2, z:1}
+                    ];
+                    
+                    for(let off of requiredOffsets) {
+                        const frameX = cx + off.x * BLOCK_SIZE;
+                        const frameZ = cz + off.z * BLOCK_SIZE;
+                        if (!checkFrame(frameX, originY, frameZ, world)) {
+                            isComplete = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isComplete) {
+                        spawnPortal(cx, originY, cz);
+                        return; // Found it, stop looking
+                    }
+                }
+            }
+        }
+
+        function checkFrame(x, y, z, world) {
+            const mesh = world.data.get(getCoordsKey(x, y, z));
+            return mesh && mesh.userData.type === 'end_frame_filled';
+        }
+
+        function spawnPortal(cx, y, cz) {
+            // Fill 3x3 center
+            for(let dx=-1; dx<=1; dx++) {
+                for(let dz=-1; dz<=1; dz++) {
+                    addBlock(cx + dx*BLOCK_SIZE, y, cz + dz*BLOCK_SIZE, 'portal'); 
+                }
+            }
+        }
+
+
+        // --- INTERACTION ---
+        const raycaster = new THREE.Raycaster();
+        const center = new THREE.Vector2(0, 0);
+        const highlightMesh = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE+0.1, BLOCK_SIZE+0.1, BLOCK_SIZE+0.1), materials.hover);
+        scene.add(highlightMesh);
+
+        document.addEventListener('mousedown', (event) => {
+            if (!controls.isLocked) return;
+            raycaster.setFromCamera(center, camera);
+            const world = getActiveWorld();
+            const intersects = raycaster.intersectObjects(world.objects);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+                const obj = intersect.object;
+
+                if (event.button === 0) { // Break
+                    if (obj.userData.type !== 'bedrock') removeBlock(obj); // Bedrock check optional
+                } else if (event.button === 2) { // Place / Use
+                    
+                    // SPECIAL INTERACTION: EYE OF ENDER
+                    if (currentBlockType === 'eye_of_ender') {
+                        if (obj.userData.type === 'end_frame') {
+                            // Convert to filled frame
+                            const pos = obj.position.clone();
+                            removeBlock(obj);
+                            addBlock(pos.x, pos.y, pos.z, 'end_frame_filled');
+                            checkPortal(pos.x, pos.y, pos.z);
+                            return; 
+                        }
+                    }
+
+                    // NORMAL PLACEMENT
+                    if (currentBlockType === 'eye_of_ender') return; // Can't place eyes as blocks elsewhere
+
+                    const pos = intersect.point.add(intersect.face.normal);
+                    const x = Math.round(pos.x / BLOCK_SIZE) * BLOCK_SIZE;
+                    const y = Math.round(pos.y / BLOCK_SIZE) * BLOCK_SIZE;
+                    const z = Math.round(pos.z / BLOCK_SIZE) * BLOCK_SIZE;
+
+                    // Player collision check
+                    const p = yawObject.position;
+                    if (Math.abs(x - p.x) < BLOCK_SIZE && Math.abs(y - p.y) < BLOCK_SIZE * 2 && Math.abs(z - p.z) < BLOCK_SIZE) return;
+
+                    addBlock(x, y, z, currentBlockType);
+                }
+            }
+        });
+
+        // --- PHYSICS LOOP ---
+        let prevTime = performance.now();
+
+        function updatePhysics(delta) {
+            // Determine active world objects
+            const world = getActiveWorld();
+            
+            // Standard movement logic
+            // Drag
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            if(isFlying) velocity.y -= velocity.y * 10.0 * delta;
+            else velocity.y -= 9.8 * 70.0 * delta;
+
+            // Input
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward || moveLeft || moveRight) {
+                const input = new THREE.Vector3(direction.x, 0, -direction.z);
+                input.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObject.rotation.y);
+                const speed = 400.0;
+                velocity.x += input.x * speed * delta;
+                velocity.z += input.z * speed * delta;
+            }
+            if (isFlying) {
+                if (moveUp) velocity.y += 400 * delta;
+                if (moveDown) velocity.y -= 400 * delta;
+            }
+
+            // Apply Pos
+            yawObject.position.add(velocity.clone().multiplyScalar(delta));
+
+            // Collision
+            if (!isFlying) {
+                // Check for Portal Collision (Improved)
+                // Raycast from head (yawObject) down to feet (length 12 covers the 10 unit height + buffer)
+                const portalRay = new THREE.Raycaster(yawObject.position, new THREE.Vector3(0, -1, 0), 0, 12);
+                const portalHits = portalRay.intersectObjects(world.objects);
+                // Check if we are intersecting a portal block
+                const inPortal = portalHits.some(h => h.object.userData.type === 'portal' && h.distance < 12);
+                
+                if (inPortal) {
+                    switchDimension(currentDim === 'overworld' ? 'the_end' : 'overworld');
+                    return; // Teleported
+                }
+
+                // Ground Collision (Multipoint)
+                const offsets = [
+                    new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 0, 2),
+                    new THREE.Vector3(-2, 0, 2), new THREE.Vector3(2, 0, -2),
+                    new THREE.Vector3(-2, 0, -2)
+                ];
+                let groundY = -Infinity;
+                let found = false;
+
+                for(let o of offsets) {
+                    const origin = yawObject.position.clone().add(o); 
+                    const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 12);
+                    const hits = ray.intersectObjects(world.objects);
+                    
+                    // FIX: Find the first hit that is NOT a portal
+                    const validHit = hits.find(h => h.object.userData.type !== 'portal');
+                    
+                    if (validHit) {
+                        if(validHit.point.y > groundY) { groundY = validHit.point.y; found = true; }
+                    }
+                }
+
+                if (found) {
+                    const dist = yawObject.position.y - 10 - groundY;
+                    if (dist < 1.5 && velocity.y <= 0) {
+                        velocity.y = 0;
+                        yawObject.position.y = groundY + 10;
+                        canJump = true;
+                    } else canJump = false;
+                } else canJump = false;
+            }
+
+            if (yawObject.position.y < -100) {
+                yawObject.position.set(0, 50, 0);
+                velocity.set(0, 0, 0);
+                if(currentDim === 'the_end') switchDimension('overworld'); // Fall out of end -> overworld
+            }
+        } // <-- MISSING CLOSING BRACE 1 ADDED HERE
+
+        // Mob Update (Fixed AI Logic + Cliff Avoidance)
+        function updateMobs(delta) {
+            mobs.forEach(mob => {
+                // Only update mobs in current dimension
+                if (mob.dim !== currentDim || mob.isDead) {
+                    mob.mesh.visible = false;
+                    return;
+                }
+                mob.mesh.visible = true;
+                
+                // AI LOGIC RESTORED
+                let target = null;
+                let minDist = 100; // aggro range
+
+                // Find target
+                if (mob.type === 'zombie') {
+                    // Zombie hunts closest villager
+                    mobs.forEach(other => {
+                        if (other.type === 'villager' && !other.isDead && other.dim === currentDim) {
+                            const dist = mob.mesh.position.distanceTo(other.mesh.position);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                target = other.mesh.position;
+                            }
+                        }
+                    });
+                    
+                    // Attack logic
+                    if (minDist < 3 && target) {
+                         const victim = mobs.find(m => m.type === 'villager' && m.mesh.position.equals(target));
+                         if (victim) {
+                             dimensions[currentDim].group.remove(victim.mesh); // Remove from Group
+                             victim.isDead = true;
+                             return; 
+                         }
+                    }
+
+                } else {
+                    // Villager flees from closest zombie
+                    mobs.forEach(other => {
+                        if (other.type === 'zombie' && !other.isDead && other.dim === currentDim) {
+                            const dist = mob.mesh.position.distanceTo(other.mesh.position);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                target = other.mesh.position;
+                            }
+                        }
+                    });
+                }
+
+                // Movement
+                const speed = mob.type === 'zombie' ? 15 : 20; 
+                const moveDir = new THREE.Vector3(0, 0, 0);
+
+                if (target) {
+                    if (mob.type === 'zombie') {
+                        moveDir.subVectors(target, mob.mesh.position).normalize();
+                    } else {
+                        // Flee
+                        moveDir.subVectors(mob.mesh.position, target).normalize();
+                    }
+                    
+                    // --- CLIFF AVOIDANCE ---
+                    // Cast a ray slightly ahead to check if there is ground
+                    const lookAheadDist = 4;
+                    const checkPos = mob.mesh.position.clone().add(moveDir.clone().multiplyScalar(lookAheadDist)).add(new THREE.Vector3(0, 5, 0));
+                    
+                    const cliffRay = new THREE.Raycaster(checkPos, new THREE.Vector3(0, -1, 0), 0, 15);
+                    const groundHits = cliffRay.intersectObjects(getActiveWorld().objects);
+                    
+                    // If ground detected ahead, it's safe to move
+                    if (groundHits.length > 0) {
+                        // Look at target
+                        if (mob.type === 'zombie') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z);
+                        else mob.mesh.lookAt(mob.mesh.position.x + moveDir.x, mob.mesh.position.y, mob.mesh.position.z + moveDir.z);
+
+                        mob.velocity.x = moveDir.x * speed;
+                        mob.velocity.z = moveDir.z * speed;
+                    } else {
+                        // STOP! Cliff detected.
+                        mob.velocity.x = 0;
+                        mob.velocity.z = 0;
+                    }
+                    
+                } else {
+                    // Friction
+                    mob.velocity.x *= 0.9;
+                    mob.velocity.z *= 0.9;
+                }
+                
+                // Gravity
+                mob.velocity.y -= 9.8 * 50.0 * delta;
+
+                // Auto Jump
+                if (target && (mob.velocity.x !== 0 || mob.velocity.z !== 0)) {
+                     const forwardRay = new THREE.Raycaster(mob.mesh.position, moveDir.normalize(), 0, 4);
+                     if (forwardRay.intersectObjects(getActiveWorld().objects).length > 0 && mob.velocity.y <= 0) {
+                          mob.velocity.y = 60; 
+                     }
+                }
+
+                mob.mesh.position.add(mob.velocity.clone().multiplyScalar(delta));
+                
+                // Collision (Simple)
+                const origin = mob.mesh.position.clone().add(new THREE.Vector3(0, 3, 0));
+                const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 10);
+                const hits = ray.intersectObjects(getActiveWorld().objects);
+                if(hits.length > 0) {
+                     const groundY = hits[0].point.y;
+                     const dist = mob.mesh.position.y - groundY;
+                     if (dist < 1.0 && dist > -5.0 && mob.velocity.y <= 0) {
+                        mob.velocity.y = 0;
+                        mob.mesh.position.y = groundY;
+                     }
+                }
+                if(mob.mesh.position.y < -100) mob.isDead = true;
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            
+            if (controls.isLocked) {
+                updatePhysics(delta);
+                
+                // Update Highlight
+                raycaster.setFromCamera(center, camera);
+                const intersects = raycaster.intersectObjects(getActiveWorld().objects);
+                if (intersects.length > 0) {
+                    highlightMesh.visible = true;
+                    highlightMesh.position.copy(intersects[0].object.position);
+                } else highlightMesh.visible = false;
+            }
+            
+            updateMobs(delta);
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>
