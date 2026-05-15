@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voxel World - Village Fixes</title>
+    <title>Voxel World - Random Village</title>
     <style>
         body {
             margin: 0;
@@ -200,6 +200,88 @@
             font-size: 40px;
             font-weight: bold;
         }
+
+        /* --- TRADING MENU UI --- */
+        #trade-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(46, 30, 20, 0.95); /* Dark wood color */
+            border: 4px solid #999; /* Iron border */
+            padding: 20px;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            z-index: 60;
+            width: 400px;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        #trade-menu h2 { margin-top: 0; color: #5c9e63; text-shadow: 2px 2px 0 #000; }
+        .trade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #555;
+            cursor: pointer;
+        }
+        .trade-item:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+        .trade-cost { color: #ff6666; }
+        .trade-arrow { color: #aaa; padding: 0 10px; }
+        .trade-reward { color: #5c9e63; font-weight: bold; }
+        #trade-close-btn {
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: #cc0000;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        /* --- INVENTORY MENU --- */
+        #inventory-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            border: 2px solid #888;
+            padding: 20px;
+            width: 500px;
+            color: white;
+            z-index: 70;
+            border-radius: 8px;
+        }
+        #inventory-menu h3 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        #inventory-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .inv-item {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+        }
+        .inv-item:hover { background: rgba(255,255,255,0.2); border-color: white; }
+        .inv-item.selected { border-color: #0ff; background: rgba(0, 255, 255, 0.2); }
+        .inv-count { font-size: 10px; position: absolute; bottom: 2px; right: 2px; }
+        .inv-name { font-size: 8px; margin-top: 2px; text-align: center; width: 100%; overflow: hidden; }
+        .inv-helper { font-size: 0.8em; color: #aaa; font-style: italic; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -241,16 +323,30 @@
         <p id="mp-status" style="font-size: 0.8em; color: #aaa; margin-top: 10px;">Status: Offline</p>
     </div>
 
+    <div id="trade-menu">
+        <h2>VILLAGE TRADER</h2>
+        <div id="trade-list"></div>
+        <button id="trade-close-btn" onclick="closeTradeMenu()">LEAVE</button>
+    </div>
+
+    <div id="inventory-menu">
+        <h3>Inventory</h3>
+        <div id="inventory-grid"></div>
+        <div class="inv-helper">Click an item, then press 1-9 to assign to Hotbar.</div>
+    </div>
+
     <div id="hotbar">
-        <div class="slot active" id="slot1" style="background-color: #5c9e63;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot2" style="background-color: #795548;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot3" style="background-color: #808080;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot4" style="background-color: #5d4037;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot5" style="background-color: #2e7d32;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot6" style="background-color: #e0d5a6;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot7" style="background-color: transparent;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot8" style="background-color: #e6ddc5;"><span class="slot-qty"></span></div>
-        <div class="slot" id="slot9" style="background-color: #6a8a4a;"><span class="slot-qty"></span></div>
+        <div class="slot active" id="slot1"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot2"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot3"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot4"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot5"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot6"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot7"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot8"><span class="slot-qty"></span></div>
+        <div class="slot" id="slot9"><span class="slot-qty"></span></div>
+        <!-- NEW 10th SLOT (Hidden by default) -->
+        <div class="slot" id="slot10" style="display: none; border-color: #ff0000;"><span class="slot-qty"></span></div>
     </div>
 
     <script>
@@ -312,6 +408,22 @@
                     case 'water':
                         filter.type = 'lowpass'; filter.frequency.setValueAtTime(400, t);
                         gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); break;
+                        // --- NEW SOUNDS ---
+                    case 'snow_block':
+                        // "Crunchy" sound: Bandpass with higher gain, longer tail
+                        filter.type = 'bandpass'; 
+                        filter.frequency.setValueAtTime(1000, t); 
+                        filter.Q.value = 1.0;
+                        gain.gain.setValueAtTime(0.5, t); 
+                        gain.gain.linearRampToValueAtTime(0, t + 0.2); 
+                        break;
+                    case 'packed_ice':
+                        // "Glassy" sound: High frequency, very short/sharp
+                        filter.type = 'highpass'; 
+                        filter.frequency.setValueAtTime(1500, t);
+                        gain.gain.setValueAtTime(0.6, t); 
+                        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); 
+                        break;
                     default:
                         filter.type = 'lowpass'; filter.frequency.setValueAtTime(300, t);
                         gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1); break;
@@ -388,6 +500,55 @@
                 gain.gain.setValueAtTime(0, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(vol * 0.4, this.ctx.currentTime + 0.1); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.8);
                 osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.8);
             }
+            playBlaze(dist = 1) {
+                if(!this.enabled) return;
+                const vol = Math.max(0, 1 - (dist/20)); if(vol <= 0) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0, this.ctx.currentTime); 
+                gain.gain.linearRampToValueAtTime(vol * 0.3, this.ctx.currentTime + 0.1); 
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+            }
+            playPigman(dist = 1) {
+                if(!this.enabled) return;
+                const vol = Math.max(0, 1 - (dist/20)); if(vol <= 0) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                // Pig grunt: Sawtooth, low freq, quick envelope
+                osc.type = 'sawtooth'; 
+                osc.frequency.setValueAtTime(60, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0, this.ctx.currentTime); 
+                gain.gain.linearRampToValueAtTime(vol * 0.5, this.ctx.currentTime + 0.05); 
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            }
+            playFireball(dist = 1) {
+                if(!this.enabled) return;
+                const vol = Math.max(0, 1 - (dist/30)); if(vol <= 0) return;
+                const osc = this.ctx.createOscillator(); 
+                const gain = this.ctx.createGain();
+                
+                // "Whoosh" / Explosion sound
+                const bufferSize = this.ctx.sampleRate * 0.3;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                
+                const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+                filter.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.3);
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                
+                noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+                noise.start();
+            }
             playVillager(dist = 1) {
                 if(!this.enabled) return;
                 const vol = Math.max(0, 1 - (dist/20)); if(vol <= 0) return;
@@ -451,6 +612,15 @@
                     mesh.position.set(x, y, z);
                     dimensions[dim].group.add(mesh);
                     this.particles.push({ mesh, vy: Math.random() * 20 - 10, vx: Math.random() * 20 - 10, vz: Math.random() * 20 - 10, life: 1.0, dim });
+                }
+            }
+            spawnFlame(x, y, z, dim) {
+                // Spawner flames
+                for(let i=0; i<5; i++) {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
+                    mesh.position.set(x + (Math.random()-0.5), y + (Math.random()-0.5), z + (Math.random()-0.5));
+                    dimensions[dim].group.add(mesh);
+                    this.particles.push({ mesh, vy: Math.random() * 5, vx: (Math.random()-0.5), vz: (Math.random()-0.5), life: 1.0, dim });
                 }
             }
             spawnDigging(x, y, z, color, dim) {
@@ -646,6 +816,15 @@
         const SINGLEPLAYER_DAY_DURATION = 600; // 10 minutes
         let singlePlayerTime = 0;
 
+        const villagePOIs = []; // Store client-side POIs
+
+        // --- NEW STATE VARIABLES ---
+        let isHost = false;
+        // Default Hotbar Configuration
+        let hotbarConfig = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'sand', 'obsidian', 'flint_and_steel', 'netherrack', 'quartz_ore'];
+        let allGameItems = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'sand', 'cactus', 'water', 'crop', 'end_frame', 'eye_of_ender', 'obsidian', 'end_stone', 'emerald', 'door', 'packed_ice', 'snow_block', 'netherrack', 'nether_brick', 'spawner', 'glowstone', 'lava', 'magma', 'quartz_ore', 'red_mushroom', 'flint_and_steel', 'blaze_rod', 'gold_nugget', 'quartz'];
+        let selectedInventoryItem = null;
+
         // --- ASSETS ---
         // --- NEW: IMPROVED CRACK TEXTURE GENERATOR ---
         const crackMaterials = [];
@@ -714,9 +893,22 @@
             const ctx = canvas.getContext('2d');
             
             if (type === 'water') {
-                ctx.fillStyle = 'rgba(0, 100, 255, 0.6)';
+                ctx.fillStyle = 'rgba(0, 80, 255, 0.7)'; // Slightly more transparent blue
                 ctx.fillRect(0, 0, 64, 64);
-                return new THREE.CanvasTexture(canvas);
+                // Add some "waves"
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                for(let i=0; i<5; i++) {
+                    const y = Math.random() * 64;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.bezierCurveTo(20, y-10, 40, y+10, 64, y);
+                    ctx.stroke();
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping; // Enable wrapping for animation
+                tex.wrapT = THREE.RepeatWrapping;
+                return tex;
             }
             
             if (type === 'crop') {
@@ -778,6 +970,178 @@
                 return new THREE.CanvasTexture(canvas);
             }
 
+            // --- NEW: EMERALD TEXTURE ---
+            if (type === 'emerald') {
+                ctx.fillStyle = '#2e7d32'; // Dark Green
+                ctx.fillRect(0, 0, 64, 64);
+                ctx.fillStyle = '#4caf50'; // Light Green Facets
+                ctx.beginPath(); ctx.moveTo(32, 10); ctx.lineTo(54, 32); ctx.lineTo(32, 54); ctx.lineTo(10, 32); ctx.fill();
+                ctx.fillStyle = '#81c784'; // Highlight
+                ctx.fillRect(28, 28, 8, 8);
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            // --- NEW: NETWORK WAND TEXTURE ---
+            if (type === 'network_wand') {
+                ctx.fillStyle = '#800000'; // Dark Red Handle
+                ctx.fillRect(28, 28, 8, 36); 
+                ctx.fillStyle = '#ff0000'; // Bright Red Tip
+                ctx.fillRect(24, 10, 16, 16);
+                ctx.fillStyle = '#ffaa00'; // Sparkle center
+                ctx.fillRect(28, 14, 8, 8);
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            if (type === 'packed_ice') {
+                // Base: Icy Blue
+                ctx.fillStyle = '#add8e6'; 
+                ctx.fillRect(0,0,64,64); 
+                
+                // Layer 1: Darker Blue shards (Depth)
+                for(let i=0; i<40; i++) {
+                    ctx.fillStyle = `rgba(100, 149, 237, ${Math.random() * 0.3})`;
+                    const s = Math.random() * 20 + 5;
+                    ctx.fillRect(Math.random()*60, Math.random()*60, s, s);
+                }
+
+                // Layer 2: White highlights (Frost/Glint)
+                for(let i=0; i<30; i++) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.4})`;
+                    const w = Math.random() * 15 + 2;
+                    ctx.fillRect(Math.random()*64, Math.random()*64, w, w);
+                }
+                
+                // Layer 3: Subtle Border
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0,0,64,64);
+
+                return new THREE.CanvasTexture(canvas);
+            }
+            
+            if (type === 'snow_block') {
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64); // Pure white
+                // Very subtle blue noise
+                for (let i = 0; i < 200; i++) {
+                    ctx.fillStyle = `rgba(200, 220, 255, ${Math.random()*0.3})`;
+                    ctx.fillRect(Math.random()*64, Math.random()*64, 2, 2);
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            // --- NETHER TEXTURES ---
+            if (type === 'netherrack') {
+                ctx.fillStyle = '#400000'; ctx.fillRect(0,0,64,64);
+                for(let i=0; i<300; i++) {
+                    ctx.fillStyle = `rgba(100, 20, 20, ${Math.random()})`;
+                    ctx.fillRect(Math.random()*64, Math.random()*64, 3, 3);
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'glowstone') {
+                ctx.fillStyle = '#443300'; ctx.fillRect(0,0,64,64);
+                for(let i=0; i<100; i++) {
+                    ctx.fillStyle = '#ffcc00'; 
+                    const s = Math.random() * 8 + 2;
+                    ctx.fillRect(Math.random()*60, Math.random()*60, s, s);
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'lava') {
+                ctx.fillStyle = '#cf1020'; ctx.fillRect(0,0,64,64);
+                ctx.strokeStyle = '#ff8000'; ctx.lineWidth = 2;
+                for(let i=0; i<10; i++) {
+                    ctx.beginPath(); ctx.moveTo(0, Math.random()*64); 
+                    ctx.bezierCurveTo(20, Math.random()*64, 40, Math.random()*64, 64, Math.random()*64);
+                    ctx.stroke();
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'nether_portal') {
+                ctx.fillStyle = 'rgba(50, 0, 80, 0.8)'; ctx.fillRect(0,0,64,64);
+                for(let i=0; i<50; i++) {
+                    ctx.fillStyle = `rgba(200, 50, 255, ${Math.random()*0.5})`;
+                    const s = Math.random() * 10;
+                    ctx.beginPath(); ctx.arc(Math.random()*64, Math.random()*64, s, 0, Math.PI*2); ctx.fill();
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'flint_and_steel') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(32, 32, 20, Math.PI, 0); ctx.fill(); // Steel C shape
+                ctx.fillStyle = '#222'; ctx.fillRect(20, 32, 10, 10); // Flint
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'blaze_rod') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(28, 10, 8, 44);
+                ctx.fillStyle = '#ffff00'; ctx.fillRect(30, 12, 4, 40);
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'blaze_head') {
+                ctx.fillStyle = '#ffcc00'; ctx.fillRect(0,0,64,64); // Gold skin
+                ctx.fillStyle = '#000'; ctx.fillRect(10, 20, 10, 10); ctx.fillRect(44, 20, 10, 10); // Eyes
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'blaze_stick') {
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#ffff00'; ctx.fillRect(10,0,20,64);
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'nether_brick') {
+                ctx.fillStyle = '#2a1a1a'; ctx.fillRect(0,0,64,64); // Dark base
+                ctx.fillStyle = '#4a2a2a'; // Bricks
+                // Draw brick pattern
+                ctx.fillRect(2, 2, 28, 18); ctx.fillRect(34, 2, 28, 18);
+                ctx.fillRect(0, 24, 14, 18); ctx.fillRect(18, 24, 28, 18); ctx.fillRect(50, 24, 14, 18);
+                ctx.fillRect(2, 46, 28, 18); ctx.fillRect(34, 46, 28, 18);
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'spawner') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#1a1a2a'; 
+                ctx.fillRect(0,0,64,4); ctx.fillRect(0,60,64,4); 
+                ctx.fillRect(0,0,4,64); ctx.fillRect(60,0,4,64);
+                ctx.fillRect(20,0,4,64); ctx.fillRect(40,0,4,64);
+                ctx.fillRect(0,20,64,4); ctx.fillRect(0,40,64,4);
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(26, 26, 12, 12);
+                return new THREE.CanvasTexture(canvas);
+            }
+            // --- NEW NETHER UPDATE TEXTURES ---
+            if (type === 'quartz_ore') {
+                ctx.fillStyle = '#400000'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#e5e5e5'; // Quartz bits
+                ctx.beginPath(); ctx.moveTo(10,10); ctx.lineTo(20,30); ctx.lineTo(30,10); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(40,40); ctx.lineTo(50,60); ctx.lineTo(60,40); ctx.fill();
+                ctx.fillRect(30, 30, 10, 10);
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'magma') {
+                ctx.fillStyle = '#501000'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#ff4000'; // Hot cracks
+                for(let i=0; i<5; i++) {
+                    ctx.fillRect(Math.random()*50, Math.random()*50, Math.random()*20+5, Math.random()*5+2);
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'red_mushroom') {
+                ctx.clearRect(0,0,64,64);
+                // Draw at bottom of texture (y=64) to prevent floating
+                ctx.fillStyle = '#cc0000'; ctx.beginPath(); ctx.arc(32, 48, 16, Math.PI, 0); ctx.fill(); // Cap
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(28, 48, 8, 16); // Stem
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'gold_nugget') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(32, 32, 10, 0, Math.PI*2); ctx.fill();
+                return new THREE.CanvasTexture(canvas);
+            }
+            if (type === 'quartz') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(32,10); ctx.lineTo(52,32); ctx.lineTo(32,54); ctx.lineTo(12,32); ctx.fill();
+                return new THREE.CanvasTexture(canvas);
+            }
+
             for (let i = 0; i < 400; i++) {
                 const x = Math.random() * 64; const y = Math.random() * 64;
                 const size = Math.random() * 4 + 1; const alpha = Math.random() * noiseFactor;
@@ -821,9 +1185,32 @@
             villagerClothes: new THREE.MeshLambertMaterial({ color: 0x8B4513 }),
             network_block: new THREE.MeshLambertMaterial({ map: createBlockTexture('#00ffff', 'network'), emissive: 0x004444, emissiveIntensity: 0.5 }),
             // --- NEW MATERIALS ---
-            water: new THREE.MeshLambertMaterial({ map: createBlockTexture('#0000ff', 'water'), transparent: true, opacity: 0.6 }),
+            water: new THREE.MeshLambertMaterial({ map: createBlockTexture('#0000ff', 'water'), transparent: true, opacity: 0.7 }),
             crop: new THREE.MeshLambertMaterial({ map: createBlockTexture('#ffffff', 'crop'), transparent: true, side: THREE.DoubleSide, alphaTest: 0.5 }),
-            door: new THREE.MeshLambertMaterial({ map: createBlockTexture('#654321', 'door') })
+            door: new THREE.MeshLambertMaterial({ map: createBlockTexture('#654321', 'door') }),
+            emerald: new THREE.MeshLambertMaterial({ map: createBlockTexture('#4caf50', 'emerald') }),
+            network_wand: new THREE.MeshLambertMaterial({ map: createBlockTexture('#ff0000', 'network_wand') }),
+            packed_ice: new THREE.MeshLambertMaterial({ map: createBlockTexture('#a5c2f5', 'packed_ice'), transparent: true, opacity: 0.9 }),
+            snow_block: new THREE.MeshLambertMaterial({ map: createBlockTexture('#ffffff', 'snow_block') }),
+            // --- NETHER MATERIALS ---
+            netherrack: new THREE.MeshLambertMaterial({ map: createBlockTexture('#400000', 'netherrack') }),
+            glowstone: new THREE.MeshBasicMaterial({ map: createBlockTexture('#ffcc00', 'glowstone') }),
+            lava: new THREE.MeshBasicMaterial({ map: createBlockTexture('#cf1020', 'lava'), transparent: true, opacity: 0.9 }),
+            nether_portal: new THREE.MeshBasicMaterial({ map: createBlockTexture('#800080', 'nether_portal'), transparent: true, opacity: 0.7, side: THREE.DoubleSide }),
+            flint_and_steel: new THREE.MeshBasicMaterial({ map: createBlockTexture('#555', 'flint_and_steel') }), // Icon only
+            blaze_rod: new THREE.MeshBasicMaterial({ map: createBlockTexture('#ffaa00', 'blaze_rod') }),
+            blaze_head: new THREE.MeshLambertMaterial({ map: createBlockTexture('#ffcc00', 'blaze_head') }),
+            blaze_stick: new THREE.MeshLambertMaterial({ map: createBlockTexture('#ffaa00', 'blaze_stick') }),
+            fireball: new THREE.MeshBasicMaterial({ map: createBlockTexture('#ff4400', 'lava') }),
+            nether_brick: new THREE.MeshLambertMaterial({ map: createBlockTexture('#4a2a2a', 'nether_brick') }),
+            spawner: new THREE.MeshLambertMaterial({ map: createBlockTexture('#1a1a2a', 'spawner'), transparent: true, side: THREE.DoubleSide }),
+            // --- NEW MATERIALS ---
+            quartz_ore: new THREE.MeshLambertMaterial({ map: createBlockTexture('#400000', 'quartz_ore') }),
+            magma: new THREE.MeshBasicMaterial({ map: createBlockTexture('#501000', 'magma') }), // Emissive-ish
+            red_mushroom: new THREE.MeshLambertMaterial({ map: createBlockTexture('#cc0000', 'red_mushroom'), transparent: true, side: THREE.DoubleSide, alphaTest: 0.5 }),
+            // Pigman
+            pigmanSkin: new THREE.MeshLambertMaterial({ color: 0xffaaaa }), // Pink
+            pigmanRot: new THREE.MeshLambertMaterial({ color: 0x448844 }), // Green overlay
         };
 
         const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'end_frame', 'eye_of_ender', 'sand', 'cactus', 'network_block'];
@@ -842,7 +1229,8 @@
         // --- DIMENSIONS ---
         const dimensions = {
             overworld: { group: new THREE.Group(), objects: [], data: new Map(), generated: true, skyColor: 0x87CEEB, fog: new THREE.Fog(0x87CEEB, 20, 200) },
-            the_end: { group: new THREE.Group(), objects: [], data: new Map(), generated: false, skyColor: 0x050505, fog: new THREE.Fog(0x050505, 20, 150) }
+            the_end: { group: new THREE.Group(), objects: [], data: new Map(), generated: false, skyColor: 0x050505, fog: new THREE.Fog(0x050505, 20, 150) },
+            the_nether: { group: new THREE.Group(), objects: [], data: new Map(), generated: false, skyColor: 0x300000, fog: new THREE.Fog(0x300000, 10, 80) }
         };
         let currentDim = 'overworld';
         function getActiveWorld() { return dimensions[currentDim]; }
@@ -855,6 +1243,7 @@
             const world = dimensions[currentDim];
             if (!world.generated) {
                 if (newDim === 'the_end' && !isConnected) generateEndWorld();
+            if (newDim === 'the_nether' && !isConnected) generateNether();
                 world.generated = true;
             }
             scene.add(world.group);
@@ -863,8 +1252,8 @@
             scene.background = new THREE.Color(world.skyColor);
             scene.fog = world.fog;
             
-            if (newDim === 'the_end') {
-                ambientLight.intensity = 0.6;
+            if (newDim === 'the_end' || newDim === 'the_nether') {
+                ambientLight.intensity = 0.8;
             }
             
             yawObject.position.set(0, 50, 0);
@@ -875,9 +1264,64 @@
         const portalGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE * 0.8, BLOCK_SIZE);
         const doorGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.2);
         
+        // Custom Cross Geometry for plants/mushrooms
+        const crossGeometry = new THREE.BufferGeometry();
+        const halfS = BLOCK_SIZE / 2;
+        const crossVerts = [
+            // Plane 1 (Diagonal A)
+            -halfS, -halfS, -halfS,  halfS, -halfS,  halfS,  -halfS,  halfS, -halfS,
+             halfS, -halfS,  halfS,   halfS,  halfS,  halfS,  -halfS,  halfS, -halfS,
+            // Plane 2 (Diagonal B)
+            -halfS, -halfS,  halfS,  halfS, -halfS, -halfS,  -halfS,  halfS,  halfS,
+             halfS, -halfS, -halfS,   halfS,  halfS, -halfS,  -halfS,  halfS,  halfS
+        ];
+        const crossUVs = [
+            0,0, 1,0, 0,1,  1,0, 1,1, 0,1,
+            0,0, 1,0, 0,1,  1,0, 1,1, 0,1
+        ];
+        // Point normals UP (0,1,0) for even lighting on foliage
+        const crossNormals = [
+            0,1,0, 0,1,0, 0,1,0,  0,1,0, 0,1,0, 0,1,0,
+            0,1,0, 0,1,0, 0,1,0,  0,1,0, 0,1,0, 0,1,0
+        ];
+        crossGeometry.setAttribute('position', new THREE.Float32BufferAttribute(crossVerts, 3));
+        crossGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(crossUVs, 2));
+        crossGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(crossNormals, 3));
+
         function getCoordsKey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
 
-        function addBlock(x, y, z, type, specificDim = null) {
+        const fluidQueue = new Set();
+
+        function updateBlockState(mesh, state) {
+            if (!mesh || !state) return;
+            // Merge state
+            mesh.userData.state = { ...mesh.userData.state, ...state };
+            
+            // Door visual logic
+            if (mesh.userData.type === 'door') {
+                const isOpen = mesh.userData.state.open;
+                if (isOpen) {
+                    mesh.rotation.y = Math.PI / 2;
+                    // Offset to simulate hinge: move away from center relative to rotation
+                    // Default center is 0,0,0 (local). 
+                    // If we rotate 90 deg around center, it spins.
+                    // To look like a hinge, we shift it.
+                    // Simplified: just shift it a bit so it opens 'inwards' or 'outwards' relative to frame
+                     mesh.position.x += 2; 
+                     mesh.position.z += 2;
+                } else {
+                    mesh.rotation.y = 0;
+                    // Reset position logic requires knowing original pos. 
+                    // Simplification: Re-snap to grid center
+                    const x = Math.round(mesh.position.x / BLOCK_SIZE) * BLOCK_SIZE;
+                    const z = Math.round(mesh.position.z / BLOCK_SIZE) * BLOCK_SIZE;
+                    mesh.position.x = x; 
+                    mesh.position.z = z;
+                }
+            }
+        }
+
+        function addBlock(x, y, z, type, specificDim = null, state = {}) {
             const world = specificDim ? dimensions[specificDim] : getActiveWorld();
             const key = getCoordsKey(x, y, z);
             if (world.data.has(key)) return;
@@ -885,12 +1329,39 @@
             let geom = geometry;
             if (type === 'portal') geom = portalGeometry;
             if (type === 'door') geom = doorGeometry;
+            if (type === 'red_mushroom' || type === 'crop') geom = crossGeometry;
 
             const mesh = new THREE.Mesh(geom, material);
-            if (type === 'portal') { mesh.position.set(x, y - BLOCK_SIZE * 0.1, z); portalEmitters.push({ x, y, z, dim: specificDim || currentDim }); } 
-            else { mesh.position.set(x, y, z); }
+            // --- WATER LEVEL VISUALS ---
+            if (type === 'water' || type === 'lava') {
+                const level = state.level !== undefined ? state.level : 8;
+                if (level < 8) {
+                    const scaleY = level / 8;
+                    mesh.scale.set(1, scaleY, 1);
+                    mesh.position.set(x, y - (BLOCK_SIZE - scaleY * BLOCK_SIZE) / 2, z);
+                } else {
+                    mesh.position.set(x, y, z);
+                }
+            }
+            else if (type === 'portal' || type === 'nether_portal') { 
+                mesh.position.set(x, y - BLOCK_SIZE * 0.1, z); 
+                if (type === 'portal') portalEmitters.push({ x, y, z, dim: specificDim || currentDim }); 
+            }
+            else if (type === 'red_mushroom' || type === 'crop') {
+                 // Center logic for cross geometry is already 0,0,0 relative
+                 mesh.position.set(x, y, z);
+            }
+            else {
+                mesh.position.set(x, y, z);
+            }
+            
             mesh.userData.type = type;
-            mesh.userData.isOpen = false; // Initial state for doors
+            mesh.userData.state = state; // Store state
+
+            // Apply initial state visuals
+            if (type === 'door' && state.open) {
+                 updateBlockState(mesh, state);
+            }
 
             world.group.add(mesh);
             world.objects.push(mesh);
@@ -913,34 +1384,24 @@
             world.data.delete(getCoordsKey(mesh.position.x, mesh.position.y, mesh.position.z));
         }
 
-        function toggleDoor(mesh, isLocal = true) {
-            if (!mesh) return;
-            mesh.userData.isOpen = !mesh.userData.isOpen;
-            const targetRotation = mesh.userData.isOpen ? Math.PI / 2 : 0;
-            mesh.rotation.y = targetRotation;
-            soundManager.playDoor();
-
-            if (isLocal && isConnected) {
-                ws.send(JSON.stringify({ 
-                    type: 'door_toggle', 
-                    x: mesh.position.x, 
-                    y: mesh.position.y, 
-                    z: mesh.position.z, 
-                    dim: currentDim 
-                }));
-            }
-        }
-
-        function placeBlockInteraction(x, y, z, type) {
+        function placeBlockInteraction(x, y, z, type, state = {}) {
             if (gameMode === 'survival') {
                 if (!inventory[type] || inventory[type] <= 0) return; // Client-side prediction
             }
 
             soundManager.playPlace(); 
             if (isConnected) {
-                ws.send(JSON.stringify({ type: 'block_place', x: x, y: y, z: z, blockType: type, dim: currentDim }));
+                ws.send(JSON.stringify({ 
+                    type: 'block_place', 
+                    x: x, y: y, z: z, 
+                    blockType: type, 
+                    dim: currentDim,
+                    state: state // Send state
+                }));
             } else {
-                addBlock(x, y, z, type);
+                addBlock(x, y, z, type, null, state);
+                if (type === 'water') scheduleFluidUpdate(x, y, z, currentDim);
+                wakeNeighbors(x, y, z, currentDim);
             }
         }
 
@@ -950,6 +1411,46 @@
                 ws.send(JSON.stringify({ type: 'block_break', x: obj.position.x, y: obj.position.y, z: obj.position.z, dim: currentDim }));
             } else {
                 removeBlock(obj);
+                wakeNeighbors(obj.position.x, obj.position.y, obj.position.z, currentDim);
+            }
+        }
+
+        function activateEndFrameInteraction(obj) {
+            // 1. Survival Check
+            if (gameMode === 'survival') {
+                if (!inventory['eye_of_ender'] || inventory['eye_of_ender'] <= 0) return;
+            }
+
+            if (isConnected) {
+                // --- MULTIPLAYER ---
+                ws.send(JSON.stringify({ 
+                    type: 'activate_end_frame', 
+                    x: obj.position.x, 
+                    y: obj.position.y, 
+                    z: obj.position.z, 
+                    dim: currentDim 
+                }));
+                soundManager.playPlace();
+                // Server sends inventory/block updates back
+            } else {
+                // --- SINGLEPLAYER ---
+                // 1. Consume Item
+                if (gameMode === 'survival') {
+                    inventory['eye_of_ender']--;
+                    updateInventoryUI();
+                }
+
+                // 2. Swap Block
+                const pos = obj.position.clone();
+                // Remove old frame (use removeBlock to clear from world data)
+                removeBlock(obj);
+                
+                // Add filled frame
+                addBlock(pos.x, pos.y, pos.z, 'end_frame_filled', currentDim);
+                
+                // 3. Effects & Logic
+                soundManager.playPlace(); // Or a specific sound
+                checkPortal(pos.x, pos.y, pos.z);
             }
         }
 
@@ -958,7 +1459,7 @@
                 const world = dimensions[key];
                 while(world.group.children.length > 0){ world.group.remove(world.group.children[0]); }
                 world.objects = []; world.data.clear();
-                if (key === 'the_end') world.generated = false; 
+                if (key !== 'overworld') world.generated = false; 
             }
             mobs.length = 0; networkEntities.clear(); portalEmitters.length = 0;
             if (!isConnected) generateOverworld(); 
@@ -983,6 +1484,8 @@
                 }
             }
             generateDesert();
+            generateLake('overworld');
+            generateIceSpikesBiome();
         }
 
         function generateDesert() {
@@ -1004,36 +1507,118 @@
             generateVillage((offset + size/2) * BLOCK_SIZE, 0 * BLOCK_SIZE);
         }
 
-        function generateVillage(cx, cz) {
-            // Client-side generation for Singleplayer (Server handles Multiplayer)
+        function generateIceSpikesBiome() {
+            // Only run if singleplayer (redundant check if called from generateOverworld, but safe)
             if (isConnected) return;
+
+            const offset = -100; // Moved further away (was -40)
+            const size = 60;
             
+            for (let x = 0; x < size; x++) {
+                for (let z = -size/2; z < size/2; z++) {
+                    const worldX = (x + offset) * BLOCK_SIZE;
+                    const worldZ = z * BLOCK_SIZE;
+                    
+                    // Smoother, flatter terrain for ice plains
+                    const h = Math.abs(Math.sin(x * 0.05) + Math.cos(z * 0.05)); 
+                    const yHeight = Math.floor(h);
+
+                    // Ground: Snow Block on top, Dirt below
+                    addBlock(worldX, yHeight * BLOCK_SIZE, worldZ, 'snow_block', 'overworld');
+                    addBlock(worldX, (yHeight - 1) * BLOCK_SIZE, worldZ, 'dirt', 'overworld');
+                    addBlock(worldX, (yHeight - 2) * BLOCK_SIZE, worldZ, 'stone', 'overworld');
+
+                    // Ice Spikes Generation
+                    if (Math.random() > 0.985) {
+                        const height = 10 + Math.floor(Math.random() * 15); // Tall spikes
+                        const isThick = Math.random() > 0.7; // 30% chance for thick spike
+
+                        for (let i = 1; i <= height; i++) {
+                            const py = (yHeight + i) * BLOCK_SIZE;
+                            
+                            // Thin Spike
+                            addBlock(worldX, py, worldZ, 'packed_ice', 'overworld');
+                            
+                            // Thick Spike Base (Tapers off near top)
+                            if (isThick && i < height * 0.7) {
+                                addBlock(worldX + BLOCK_SIZE, py, worldZ, 'packed_ice', 'overworld');
+                                addBlock(worldX, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
+                                addBlock(worldX + BLOCK_SIZE, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- RANDOMIZED VILLAGE GENERATION ---
+        function generateVillage(cx, cz) {
+            // Client check for Singleplayer
+            if (isConnected) return; 
+
             const dim = 'overworld';
             const villageY = 2 * BLOCK_SIZE; 
             
-            // Main Street
-            for(let z = -40; z <= 40; z+=BLOCK_SIZE) {
+            // REDUCED Street Length to ensure it stays inside the generated Desert biome
+            const streetLength = 25; 
+            
+            for(let z = -streetLength; z <= streetLength; z+=BLOCK_SIZE) {
                 for(let x = -5; x <= 5; x+=BLOCK_SIZE) {
-                     addBlock(cx + x, villageY, cz + z, 'stone', dim);
+                    addBlock(cx + x, villageY, cz + z, 'stone', dim);
                 }
             }
             
-            // Houses
-            const houseOffsets = [-30, -10, 10, 30];
-            houseOffsets.forEach(zOff => {
-                buildHouse(cx - 15 * BLOCK_SIZE, villageY + BLOCK_SIZE, cz + zOff * BLOCK_SIZE, dim);
-                buildHouse(cx + 15 * BLOCK_SIZE, villageY + BLOCK_SIZE, cz + zOff * BLOCK_SIZE, dim);
-            });
+            const step = 20; 
+            // Constrain loop to new street length
+            for(let z = -streetLength + 10; z <= streetLength - 10; z += step) {
+                // Left Side
+                if (Math.random() > 0.3) { 
+                    const type = Math.random() > 0.7 ? 'farm' : 'house'; 
+                    const px = cx - 15 * BLOCK_SIZE;
+                    const pz = cz + z * BLOCK_SIZE;
+                    
+                    if (type === 'house') {
+                        buildHouse(px, villageY + BLOCK_SIZE, pz, dim);
+                        villagePOIs.push({ x: px, y: villageY + BLOCK_SIZE, z: pz, type: 'house' });
+                    } else {
+                        buildFarm(px - 10*BLOCK_SIZE, villageY, pz, dim);
+                        villagePOIs.push({ x: px, y: villageY + BLOCK_SIZE, z: pz, type: 'farm' });
+                    }
+                }
+
+                // Right Side
+                if (Math.random() > 0.3) {
+                    const type = Math.random() > 0.7 ? 'farm' : 'house';
+                    const px = cx + 15 * BLOCK_SIZE;
+                    const pz = cz + z * BLOCK_SIZE;
+                    
+                    if (type === 'house') {
+                        buildHouse(px, villageY + BLOCK_SIZE, pz, dim);
+                        villagePOIs.push({ x: px, y: villageY + BLOCK_SIZE, z: pz, type: 'house' });
+                    } else {
+                        buildFarm(px + 10*BLOCK_SIZE, villageY, pz, dim);
+                        villagePOIs.push({ x: px, y: villageY + BLOCK_SIZE, z: pz, type: 'farm' });
+                    }
+                }
+            }
             
-            // Farms
-            buildFarm(cx - 25 * BLOCK_SIZE, villageY, cz, dim);
-            buildFarm(cx + 25 * BLOCK_SIZE, villageY, cz, dim);
-            
-            // Villagers
-            for(let i=0; i<10; i++) {
-                const vx = cx + (Math.random() - 0.5) * 40 * BLOCK_SIZE;
-                const vz = cz + (Math.random() - 0.5) * 80 * BLOCK_SIZE;
-                spawnMob(vx, villageY + 5 * BLOCK_SIZE, vz, 'villager', dim, 'clientMob');
+            // Spawn villagers closer to center
+            const count = 5 + Math.floor(Math.random() * 8);
+            for(let i=0; i<count; i++) {
+                // Tighter spawn radius
+                const vx = cx + (Math.random() - 0.5) * 20 * BLOCK_SIZE;
+                const vz = cz + (Math.random() - 0.5) * 40 * BLOCK_SIZE;
+                // Handle Server vs Client spawn syntax
+                if (typeof spawnMob === 'function') {
+                    // Client
+                    if (typeof isConnected !== 'undefined') {
+                        // index.html version
+                        spawnMob(vx, villageY + 5 * BLOCK_SIZE, vz, 'villager', dim, 'clientMob');
+                    } else {
+                        // server.js version
+                        spawnMob('villager', vx, villageY + 5 * BLOCK_SIZE, vz, dim);
+                    }
+                }
             }
         }
 
@@ -1057,7 +1642,8 @@
                             else {
                                 // Door
                                 if (i===2 && k===0 && j < 2) {
-                                    addBlock(bx, by, bz, 'door', dim);
+                                    // INITIAL STATE: Closed
+                                    addBlock(bx, by, bz, 'door', dim, { open: false });
                                     continue;
                                 }
                                 if (j < 3 && i===2 && k===0) continue;
@@ -1085,7 +1671,7 @@
                     }
 
                     if (i===0 || i===6 || k===0 || k===6) {
-                        addBlock(bx, y, bz, 'wood', dim);
+                        addBlock(bx, y+BLOCK_SIZE, bz, 'wood', dim);
                     } else {
                         if (i===3) {
                             addBlock(bx, y, bz, 'water', dim);
@@ -1120,6 +1706,105 @@
             addBlock(0, BLOCK_SIZE, -5 * BLOCK_SIZE, 'network_block', 'the_end');
         }
 
+        function generateNether() {
+            const size = 40;
+            const dim = 'the_nether';
+            
+            // Terrain
+            for (let x = -size; x < size; x++) {
+                for (let z = -size; z < size; z++) {
+                    const xp = x * BLOCK_SIZE; const zp = z * BLOCK_SIZE;
+                    addBlock(xp, 30*BLOCK_SIZE, zp, 'bedrock', dim);
+                    const h = Math.floor(Math.abs(Math.sin(x*0.1) + Math.cos(z*0.1)) * 2);
+                    for(let y=0; y<=h; y++) {
+                        let type = 'netherrack';
+                        // Quartz Ore (embedded in Netherrack)
+                        if (Math.random() < 0.05) type = 'quartz_ore';
+                        addBlock(xp, y*BLOCK_SIZE, zp, type, dim);
+                    }
+                    
+                    // Magma & Lava
+                    if (h < 2) {
+                        addBlock(xp, 2*BLOCK_SIZE, zp, 'lava', dim);
+                    }
+                    
+                    // Surface Magma Patches
+                    if (Math.random() < 0.03) {
+                        // Replace surface block with Magma
+                        addBlock(xp, h*BLOCK_SIZE, zp, 'magma', dim);
+                    }
+
+                    if (Math.random() < 0.02) addBlock(xp, 28*BLOCK_SIZE, zp, 'glowstone', dim);
+                    if (h > 2 && Math.random() < 0.03) addBlock(xp, (h+1)*BLOCK_SIZE, zp, 'red_mushroom', dim);
+
+                    // Pigmen Spawning (SP)
+                    if (Math.random() < 0.01 && h > 2) {
+                         spawnMob(xp, (h+1)*BLOCK_SIZE, zp, 'pigman', dim, 'clientMob');
+                    }
+                }
+            }
+
+            // Citadels (Singleplayer)
+            const citadelOffsets = [{x: 20, z: 20}, {x: -20, z: -20}, {x: 20, z: -20}, {x: -20, z: 20}];
+            citadelOffsets.forEach(offset => {
+                generateCitadel(offset.x * BLOCK_SIZE, 10 * BLOCK_SIZE, offset.z * BLOCK_SIZE, dim);
+            });
+        }
+
+        function generateCitadel(cx, cy, cz, dim) {
+            // Base
+            for(let x=-5; x<=5; x++) {
+                for(let z=-5; z<=5; z++) {
+                    addBlock(cx + x*BLOCK_SIZE, cy, cz + z*BLOCK_SIZE, 'nether_brick', dim);
+                }
+            }
+            // Pillars
+            const corners = [[-5,-5], [5,-5], [-5,5], [5,5]];
+            corners.forEach(c => {
+                for(let y=1; y<=5; y++) {
+                    addBlock(cx + c[0]*BLOCK_SIZE, cy + y*BLOCK_SIZE, cz + c[1]*BLOCK_SIZE, 'nether_brick', dim);
+                }
+                addBlock(cx + c[0]*BLOCK_SIZE, cy + 6*BLOCK_SIZE, cz + c[1]*BLOCK_SIZE, 'glowstone', dim);
+            });
+            // Spawner Altar
+            for(let y=1; y<=2; y++) { addBlock(cx, cy + y*BLOCK_SIZE, cz, 'nether_brick', dim); }
+            addBlock(cx, cy + 3*BLOCK_SIZE, cz, 'spawner', dim);
+            spawners.push({ x: cx, y: cy + 3*BLOCK_SIZE, z: cz, dim: dim, timer: 0, mobType: 'blaze' });
+            // Roof Ring
+            for(let x=-3; x<=3; x++) {
+                for(let z=-3; z<=3; z++) {
+                    if (Math.abs(x) === 3 || Math.abs(z) === 3) {
+                        addBlock(cx + x*BLOCK_SIZE, cy + 5*BLOCK_SIZE, cz + z*BLOCK_SIZE, 'nether_brick', dim);
+                    }
+                }
+            }
+        }
+
+        function updateSpawners(delta) {
+            spawners.forEach(spawner => {
+                // Check if block exists
+                const k = getCoordsKey(spawner.x, spawner.y, spawner.z);
+                const block = dimensions[spawner.dim].data.get(k);
+                if (!block || block.userData.type !== 'spawner') return;
+
+                spawner.timer += delta;
+                if (spawner.timer < 5.0) return;
+
+                // Check distance to player
+                if (spawner.dim === currentDim) {
+                    const dist = Math.hypot(yawObject.position.x - spawner.x, yawObject.position.y - spawner.y, yawObject.position.z - spawner.z);
+                    if (dist < 16 * BLOCK_SIZE) {
+                        spawner.timer = 0;
+                        const ox = (Math.random() - 0.5) * 8 * BLOCK_SIZE;
+                        const oz = (Math.random() - 0.5) * 8 * BLOCK_SIZE;
+                        // Singleplayer Spawn
+                        spawnMob(spawner.x + ox, spawner.y, spawner.z + oz, spawner.mobType, spawner.dim, 'clientMob');
+                        particleSystem.spawnFlame(spawner.x, spawner.y, spawner.z, spawner.dim);
+                    }
+                }
+            });
+        }
+
         function createTree(x, y, z, dim) {
             for(let i=0; i<4; i++) addBlock(x, y + (i*BLOCK_SIZE), z, 'wood', dim);
             const topY = y + (4*BLOCK_SIZE);
@@ -1134,8 +1819,137 @@
             addBlock(x, topY + (2*BLOCK_SIZE), z, 'leaves', dim);
         }
 
-        const mobs = []; 
+        // --- FLUID SIMULATION (CLIENT) ---
+        function scheduleFluidUpdate(x, y, z, dim) {
+            fluidQueue.add(getCoordsKey(x, y, z));
+        }
+
+        function wakeNeighbors(x, y, z, dim) {
+            const offsets = [{x:0, y:1, z:0}, {x:0, y:-1, z:0}, {x:1, y:0, z:0}, {x:-1, y:0, z:0}, {x:0, y:0, z:1}, {x:0, y:0, z:-1}];
+            offsets.forEach(o => {
+                const k = getCoordsKey(x + o.x*BLOCK_SIZE, y + o.y*BLOCK_SIZE, z + o.z*BLOCK_SIZE);
+                const block = dimensions[dim].data.get(k);
+                if (block && (block.userData.type === 'water' || block.userData.type === 'lava')) fluidQueue.add(k);
+            });
+        }
+
+        // --- FLUID SIMULATION (CLIENT) ---
+        let fluidTickTimer = 0;
+        const FLUID_TICK_RATE = 0.1;
+
+        function updateFluids(delta) {
+            fluidTickTimer += delta;
+            if (fluidTickTimer < FLUID_TICK_RATE) return;
+            fluidTickTimer = 0;
+
+            if (fluidQueue.size === 0) return;
+            const dim = currentDim;
+            const world = dimensions[dim];
+            const processing = Array.from(fluidQueue);
+            fluidQueue.clear();
+
+            processing.forEach(key => {
+                const block = world.data.get(key);
+                if (!block || (block.userData.type !== 'water' && block.userData.type !== 'lava')) return;
+                
+                // Read original grid position, not mesh position (which might be shifted due to level scaling)
+                const parts = key.split(',');
+                const x = parseInt(parts[0]);
+                const y = parseInt(parts[1]);
+                const z = parseInt(parts[2]);
+                const level = block.userData.state?.level || 8;
+                const type = block.userData.type; // Capture type (water/lava)
+
+                // 1. Flow Down
+                const downKey = getCoordsKey(x, y - BLOCK_SIZE, z);
+                const downBlock = world.data.get(downKey);
+                
+                if (!downBlock) {
+                    addBlock(x, y - BLOCK_SIZE, z, type, dim, { level: 8 });
+                    scheduleFluidUpdate(x, y - BLOCK_SIZE, z, dim);
+                    return;
+                } else if (downBlock.userData.type === type && (downBlock.userData.state?.level || 8) < 8) {
+                    // Fill neighbor
+                    addBlock(x, y - BLOCK_SIZE, z, type, dim, { level: 8 });
+                    scheduleFluidUpdate(x, y - BLOCK_SIZE, z, dim);
+                    return;
+                }
+
+                // 2. Flow Sideways
+                if (level > 1) {
+                    const offsets = [{x:1, z:0}, {x:-1, z:0}, {x:0, z:1}, {x:0, z:-1}];
+                    offsets.forEach(o => {
+                        const nx = x + o.x*BLOCK_SIZE; const nz = z + o.z*BLOCK_SIZE;
+                        const nKey = getCoordsKey(nx, y, nz);
+                        const nBlock = world.data.get(nKey);
+                        
+                        if (!nBlock) {
+                            addBlock(nx, y, nz, type, dim, { level: level - 1 });
+                            scheduleFluidUpdate(nx, y, nz, dim);
+                        } else if (nBlock.userData.type === type) {
+                            const nLevel = nBlock.userData.state?.level || 0;
+                            if (nLevel < level - 1) {
+                                addBlock(nx, y, nz, type, dim, { level: level - 1 });
+                                scheduleFluidUpdate(nx, y, nz, dim);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        
+        function generateLake(dim) {
+            if (Math.random() > 0.5) return;
+            const cx = (Math.random() - 0.5) * WORLD_SIZE * BLOCK_SIZE * 0.5;
+            const cz = (Math.random() - 0.5) * WORLD_SIZE * BLOCK_SIZE * 0.5;
+            const radius = 6 + Math.random() * 6;
+
+            for (let x = -radius; x <= radius; x++) {
+                for (let z = -radius; z <= radius; z++) {
+                    const dist = Math.sqrt(x*x + z*z);
+                    if (dist > radius) continue;
+                    const wx = cx + x * BLOCK_SIZE; const wz = cz + z * BLOCK_SIZE;
+                    const depth = Math.floor(radius - dist) * 0.6;
+                    
+                    let surfaceY = -100;
+                    for(let y=30; y>-10; y--) {
+                        const k = getCoordsKey(Math.round(wx/5)*5, y*5, Math.round(wz/5)*5);
+                        const b = dimensions[dim].data.get(k);
+                        // IGNORE TREES
+                        if (b && b.userData.type !== 'air' && b.userData.type !== 'leaves' && b.userData.type !== 'wood' && b.userData.type !== 'cactus') { 
+                            surfaceY = y*5; break; 
+                        }
+                    }
+                    if(surfaceY === -100) continue;
+
+                    for (let d = 0; d < depth + 2; d++) {
+                        const dy = surfaceY - (d * BLOCK_SIZE);
+                        const bx = Math.round(wx/5)*5;
+                        const bz = Math.round(wz/5)*5;
+                        
+                        const k = getCoordsKey(bx, dy, bz);
+                        const mesh = dimensions[dim].data.get(k);
+                        if (mesh) removeBlock(mesh);
+                        
+                        if (d > 0) addBlock(bx, dy, bz, 'water', dim, { level: 8 });
+                        
+                        // Solid Bottom
+                        if (d === Math.floor(depth + 2) - 1 || d > depth) {
+                            const belowY = dy - BLOCK_SIZE;
+                            const belowK = getCoordsKey(bx, belowY, bz);
+                            const belowMesh = dimensions[dim].data.get(belowK);
+                            if (!belowMesh || belowMesh.userData.type === 'water' || belowMesh.userData.type === 'leaves') {
+                                 addBlock(bx, belowY, bz, 'sand', dim);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mobs = []; 
         const networkEntities = new Map();
+        const projectiles = new Map(); // Store client-side projectiles
 
         function updateNametag(entity, username) {
             const oldSprite = entity.mesh.getObjectByName("nametag");
@@ -1176,16 +1990,30 @@
                 
                 const crystal = new THREE.Mesh(crystalGeo, crystalMat);
                 const core = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), coreMat);
+                crystal.position.y = 2.5; core.position.y = 2.5;
+                crystal.name = 'rotator'; core.name = 'rotator2';
+                group.add(crystal); group.add(core);
+            } else if (type === 'blaze') {
+                // Blaze Model
+                // Head
+                const head = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), materials.blaze_head);
+                head.position.y = 6;
+                group.add(head);
                 
-                crystal.position.y = 2.5;
-                core.position.y = 2.5;
+                // Rods
+                const rodGeo = new THREE.BoxGeometry(0.8, 4, 0.8);
+                const rodsGroup = new THREE.Group();
+                rodsGroup.name = 'blaze_rods';
+                group.add(rodsGroup);
                 
-                // For rotation
-                crystal.name = 'rotator';
-                core.name = 'rotator2';
-                
-                group.add(crystal);
-                group.add(core);
+                // 3 Layers of rods
+                for(let i=0; i<12; i++) {
+                    const rod = new THREE.Mesh(rodGeo, materials.blaze_stick);
+                    const angle = (i / 12) * Math.PI * 2;
+                    const radius = 2.5;
+                    rod.position.set(Math.cos(angle) * radius, 4 + Math.sin(i)*1, Math.sin(angle) * radius);
+                    rodsGroup.add(rod);
+                }
             } else {
                 // Normal Mob/Player
                 const bodyW = 3, bodyH = 6, bodyD = 2; const headSize = 2.5;
@@ -1196,14 +2024,35 @@
                 const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), clothMat); body.position.y = bodyH / 2; group.add(body);
                 const head = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skinMat); head.position.y = bodyH + (headSize / 2); group.add(head);
                 const armGeo = new THREE.BoxGeometry(1, 6, 1);
-                const armL = new THREE.Mesh(armGeo, skinMat); armL.position.set(-2, 3, 0); if (type === 'zombie') { armL.rotation.x = -Math.PI / 2; armL.position.set(-2, 5, 2); } group.add(armL);
-                const armR = new THREE.Mesh(armGeo, skinMat); armR.position.set(2, 3, 0); if (type === 'zombie') { armR.rotation.x = -Math.PI / 2; armR.position.set(2, 5, 2); } group.add(armR);
+                const armL = new THREE.Mesh(armGeo, skinMat); armL.position.set(-2, 3, 0); 
+                const armR = new THREE.Mesh(armGeo, skinMat); armR.position.set(2, 3, 0); 
+                
+                if (type === 'zombie' || type === 'pigman') { 
+                    armL.rotation.x = -Math.PI / 2; armL.position.set(-2, 5, 2); 
+                    armR.rotation.x = -Math.PI / 2; armR.position.set(2, 5, 2); 
+                }
+                
+                if (type === 'pigman') {
+                     // Green head rot overlay
+                     head.material = materials.pigmanSkin;
+                     body.material = materials.pigmanSkin;
+                     armL.material = materials.pigmanSkin;
+                     armR.material = materials.pigmanSkin;
+                     // Gold Sword (Simple)
+                     const sword = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.5), new THREE.MeshBasicMaterial({color: 0xffd700}));
+                     sword.position.set(0, -2, -1);
+                     sword.rotation.x = Math.PI/2;
+                     armR.add(sword);
+                }
+
+                group.add(armL);
+                group.add(armR);
             }
 
             dimensions[dim].group.add(group);
             
             if (type !== 'player') {
-                mobs.push({ mesh: group, type: type, velocity: new THREE.Vector3(0, 0, 0), isDead: false, dim: dim, id, lastGruntTime: 0, lastAttackTime: 0, health: group.userData.health, lastDamageTime: 0 });
+                mobs.push({ mesh: group, type: type, velocity: new THREE.Vector3(0, 0, 0), isDead: false, dim: dim, id, lastGruntTime: 0, lastAttackTime: 0, health: group.userData.health, lastDamageTime: 0, aiState: { mode: 'idle', target: null, timer: 0 } });
             }
             if (id !== 'clientMob') {
                 const entity = { mesh: group, dim, username: "", health: group.userData.health, localDead: false };
@@ -1211,6 +2060,140 @@
                 if (type === 'player') updateNametag(entity, username);
             }
             return group;
+        }
+
+        // --- CLIENT-SIDE VILLAGER AI (SINGLEPLAYER) ---
+        function updateVillagerAI(mob, delta, timeRatio) {
+            // Only AI for villagers in overworld
+            if (mob.type !== 'villager' || mob.dim !== 'overworld') return;
+
+            // --- NEW: TRADING FREEZE ---
+            if (mob.isTrading) {
+                mob.velocity.x = 0;
+                mob.velocity.z = 0;
+                // Make them look at player (simple approximation)
+                mob.mesh.lookAt(yawObject.position.x, mob.mesh.position.y, yawObject.position.z);
+                return;
+            }
+
+            if (!mob.aiState) mob.aiState = { mode: 'idle', target: null, timer: 0 };
+            mob.aiState.timer -= delta;
+
+            // FIX: Extend night time to 0.99 so they stay in while zombies burn (0.95+)
+            const isNight = timeRatio > 0.45 && timeRatio < 0.99;
+
+            // 1. DECISION MAKING
+            if (isNight && mob.aiState.mode !== 'sleeping') {
+                mob.aiState.mode = 'sleeping';
+                if (villagePOIs.length > 0) {
+                    const houses = villagePOIs.filter(p => p.type === 'house');
+                    if (houses.length > 0) {
+                        mob.aiState.target = houses[Math.floor(Math.random() * houses.length)];
+                    }
+                }
+            } 
+            else if (!isNight && mob.aiState.mode === 'sleeping') {
+                mob.aiState.mode = 'idle';
+                mob.aiState.timer = 0; 
+            }
+
+            if (!isNight && mob.aiState.timer <= 0) {
+                mob.aiState.timer = 5 + Math.random() * 15; 
+                const roll = Math.random();
+                if (roll < 0.6) {
+                    mob.aiState.mode = 'farming';
+                    const farms = villagePOIs.filter(p => p.type === 'farm');
+                    if (farms.length > 0) mob.aiState.target = farms[Math.floor(Math.random() * farms.length)];
+                } else {
+                    mob.aiState.mode = 'wandering';
+                    const targetX = 300 * BLOCK_SIZE + (Math.random() - 0.5) * 100; 
+                    const targetZ = 0 + (Math.random() - 0.5) * 100;
+                    mob.aiState.target = { x: targetX, z: targetZ };
+                }
+            }
+
+            // 2. MOVEMENT
+            if (mob.aiState.target) {
+                // Use mesh position for client, raw x/z for server
+                const currentX = mob.x !== undefined ? mob.x : mob.mesh.position.x;
+                const currentZ = mob.z !== undefined ? mob.z : mob.mesh.position.z;
+                const currentY = mob.y !== undefined ? mob.y : mob.mesh.position.y;
+                
+                const tx = mob.aiState.target.x;
+                const tz = mob.aiState.target.z;
+                const dx = tx - currentX;
+                const dz = tz - currentZ;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+
+                if (dist > 3) { 
+                    const speed = 15;
+                    // Update velocity
+                    if (mob.vx !== undefined) {
+                        // Server object
+                        mob.vx = (dx / dist) * speed;
+                        mob.vz = (dz / dist) * speed;
+                        mob.yaw = Math.atan2(dx, dz);
+                    } else {
+                        // Client object
+                        mob.velocity.x = (dx / dist) * speed;
+                        mob.velocity.z = (dz / dist) * speed;
+                        mob.mesh.lookAt(tx, currentY, tz);
+                    }
+                    
+                    // --- HAZARD CHECK (Cactus & Void) ---
+                    const lookX = mob.mesh.position.x + (dx/dist) * 3;
+                    const lookZ = mob.mesh.position.z + (dz/dist) * 3;
+                    
+                    const bx = Math.round(lookX / BLOCK_SIZE) * BLOCK_SIZE;
+                    const by = Math.round(mob.mesh.position.y / BLOCK_SIZE) * BLOCK_SIZE;
+                    const bz = Math.round(lookZ / BLOCK_SIZE) * BLOCK_SIZE;
+                    
+                    // 1. Cactus Check (Body Level)
+                    const wallKey = getCoordsKey(bx, by, bz);
+                    const wallBlock = getActiveWorld().data.get(wallKey);
+                    if (wallBlock && wallBlock.userData.type === 'cactus') {
+                        mob.velocity.x *= -1; mob.velocity.z *= -1; mob.aiState.timer = 0; return;
+                    }
+
+                    // 2. Void/Cliff Check (Feet Level)
+                    let hasFloor = false;
+                    for (let y = by - BLOCK_SIZE; y > -101; y -= BLOCK_SIZE) {
+                    const floorKey = getCoordsKey(bx, y, bz);
+                    const floorBlock = getActiveWorld().data.get(floorKey);
+                    if (floorBlock && floorBlock.userData.type !== 'air') {
+                        hasFloor = true;
+                    }
+                    }
+
+                    // If floor is empty, stop moving (don't jump off cliff)
+                    if (!hasFloor) {
+                        mob.velocity.x = 0; mob.velocity.z = 0; mob.aiState.timer = 0; return;
+                    }
+
+                    // 3. Auto Jump (WITH ROOF GLITCH FIX)
+                    // If we are sleeping and hit a house wall (sand/stone/wood), DO NOT JUMP.
+                    // This forces them to slide along the wall until they find the door.
+                    const isHouseBlock = wallBlock && (wallBlock.type === 'sand' || wallBlock.type === 'wood');
+                    const preventJump = mob.aiState.mode === 'sleeping' && isHouseBlock;
+
+                    if (wallBlock && wallBlock.type !== 'air' && wallBlock.type !== 'crop' && !wallBlock.type.includes('door')) {
+                        if (!preventJump) {
+                            // Server vs Client Velocity
+                            if (mob.velocity.y <= 0) mob.velocity.y = 25;
+                        }
+                    }
+
+                } else {
+                    // Arrived
+                    if (mob.vx !== undefined) { mob.vx = 0; mob.vz = 0; }
+                    else { mob.velocity.x = 0; mob.velocity.z = 0; }
+                    
+                    if (mob.aiState.mode === 'farming') {
+                        if(mob.yaw !== undefined) mob.yaw += delta * 2;
+                        else mob.mesh.rotation.y += delta * 2;
+                    }
+                }
+            }
         }
 
         generateOverworld();
@@ -1250,6 +2233,7 @@
         let debugVisible = false;
         let walkedDistance = 0;
         let lastDamageTime = 0;
+        let lastPlayerPortalTime = 0;
         
         // GAME MODE STATE
         let gameMode = 'creative'; // 'creative' or 'survival'
@@ -1279,11 +2263,31 @@
 
         let lastSpaceTime = 0;
         document.addEventListener('keydown', (event) => {
-            if (event.code == 'F4') { switchDimension('the_end') }
+            //if (event.code == 'F4') { switchDimension('the_end') }
             if (event.code === 'F3') {
                 event.preventDefault(); debugVisible = !debugVisible;
                 document.getElementById('debug-menu').style.display = debugVisible ? 'block' : 'none'; return;
             }
+
+            // --- NEW: Inventory Toggle ---
+            if (event.code === 'KeyE') {
+                if (document.getElementById('multiplayer-menu').style.display === 'block')
+                    return; // Don't open the inventory in the network menu
+                toggleInventory();
+                return;
+            }
+
+            // --- NEW: Assign to Hotbar (If Inventory Open) ---
+            const menuOpen = document.getElementById('inventory-menu').style.display === 'block';
+            if (menuOpen && event.code.startsWith('Digit')) {
+                const slotNum = parseInt(event.code.replace('Digit', '')) - 1;
+                if (slotNum >= 0 && slotNum < 9 && selectedInventoryItem) {
+                    hotbarConfig[slotNum] = selectedInventoryItem;
+                    updateHotbarVisuals();
+                }
+                return;
+            }
+
             switch (event.code) {
                 case 'KeyW': moveForward = true; break;
                 case 'KeyA': moveLeft = true; break;
@@ -1302,15 +2306,16 @@
                     if (!isFlying && canJump) { velocity.y += 150; canJump = false; }
                     break;
                 case 'ShiftLeft': moveDown = true; break;
-                case 'Digit1': selectBlock(0); break;
-                case 'Digit2': selectBlock(1); break;
-                case 'Digit3': selectBlock(2); break;
-                case 'Digit4': selectBlock(3); break;
-                case 'Digit5': selectBlock(4); break;
-                case 'Digit6': selectBlock(5); break;
-                case 'Digit7': selectBlock(6); break;
-                case 'Digit8': selectBlock(7); break;
-                case 'Digit9': selectBlock(8); break;
+            }
+
+            if (!menuOpen) {
+                if (event.code === 'Digit0') {
+                    selectBlock(9); // Select 10th slot
+                }
+                else if (event.code.startsWith('Digit')) {
+                    const idx = parseInt(event.code.replace('Digit', '')) - 1;
+                    if (idx >= 0 && idx < 9) selectBlock(idx);
+                }
             }
         });
 
@@ -1325,31 +2330,306 @@
             }
         });
 
-        function selectBlock(index) {
-            if (index >= blockTypes.length) return;
-            currentBlockType = blockTypes[index];
-            // Update hand material
-            if (materials[currentBlockType]) {
-                handMesh.material = materials[currentBlockType];
-            }
-            document.querySelectorAll('.slot').forEach((el, i) => { el.classList.toggle('active', i === index); });
+        // --- HELPER: ITEM COLORS ---
+        function getItemColor(type) {
+            const colorMap = {
+                'grass': '#5c9e63',
+                'dirt': '#5d4037',
+                'stone': '#808080',
+                'wood': '#4e342e',
+                'leaves': '#2e7d32',
+                'sand': '#e6ddc5',
+                'cactus': '#6a8a4a',
+                'water': '#4040ff',
+                'crop': '#d4c459',
+                'end_frame': '#e0d5a6',
+                'eye_of_ender': '#8aff8a',
+                'obsidian': '#1a1a2e',
+                'end_stone': '#fcf8d2', // New Color
+                'emerald': '#4caf50',
+                'network_wand': '#ff0000',
+                'door': '#654321',
+                'packed_ice': '#a5c2f5',
+                'snow_block': '#ffffff'
+            };
+            return colorMap[type] || '#555555';
         }
+        // --- UI ICON GENERATOR ---
+        const iconCache = {};
 
-        function updateInventoryUI() {
+        updateHotbarVisuals(); // Call this when the game starts
+
+        function getIconDataUrl(type) {
+            if (iconCache[type]) return iconCache[type];
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            // Helper for noise
+            function drawNoise(color, alpha = 0.1) {
+                ctx.fillStyle = color; ctx.fillRect(0,0,64,64);
+                for (let i = 0; i < 400; i++) {
+                    ctx.fillStyle = `rgba(0,0,0,${Math.random()*alpha})`;
+                    ctx.fillRect(Math.random()*64, Math.random()*64, 4, 4);
+                }
+            }
+
+            // --- DRAWING LOGIC ---
+            if (type === 'eye_of_ender') {
+                ctx.fillStyle = '#6a9e6a'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#8aff8a'; ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#004400'; ctx.beginPath(); ctx.ellipse(32, 32, 6, 14, 0, 0, Math.PI*2); ctx.fill();
+            } 
+            else if (type === 'end_frame' || type === 'end_frame_filled') {
+                drawNoise('#e0d5a6'); // End stone base
+                ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(32, 32, 15, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 4; ctx.strokeRect(10, 10, 44, 44);
+                if (type === 'end_frame_filled') {
+                    ctx.fillStyle = '#3c8'; ctx.beginPath(); ctx.arc(32, 32, 8, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#000'; ctx.fillRect(30, 20, 4, 24);
+                }
+            }
+            else if (type === 'network_wand') {
+                ctx.clearRect(0,0,64,64); // Transparent bg
+                ctx.fillStyle = '#800000'; ctx.fillRect(28, 28, 8, 36); // Handle
+                ctx.fillStyle = '#ff0000'; ctx.fillRect(24, 10, 16, 16); // Tip
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(28, 14, 8, 8);   // Sparkle
+            }
+            else if (type === 'grass') {
+                // Special "Side View" for Inventory
+                drawNoise('#5d4037'); // Dirt
+                ctx.fillStyle = '#5c9e63'; ctx.fillRect(0, 0, 64, 20); // Grass Top
+                for(let i=0; i<10; i++) { // Drips
+                    ctx.fillRect(Math.random()*60, 20, 4, Math.random()*10);
+                }
+            }
+            else if (type === 'network_block') {
+                ctx.fillStyle = '#008888'; ctx.fillRect(0,0,64,64);
+                ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 4; ctx.strokeRect(5,5,54,54);
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(64,64); ctx.moveTo(64,0); ctx.lineTo(0,64); ctx.stroke();
+                ctx.fillStyle = '#afffff'; ctx.fillRect(28, 28, 8, 8);
+            }
+            else if (type === 'cactus') {
+                ctx.fillStyle = '#6a8a4a'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = 'rgba(0,0,0,0.2)'; for(let x=8; x<64; x+=16) ctx.fillRect(x, 0, 4, 64); // Ribs
+                ctx.fillStyle = '#333'; for(let i=0; i<10; i++) ctx.fillRect(Math.random()*60, Math.random()*60, 2, 2); // Spikes
+            }
+            else if (type === 'door') {
+                ctx.fillStyle = '#654321'; ctx.fillRect(0,0,64,64);
+                ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 4; ctx.strokeRect(5,5,54,54);
+                ctx.fillStyle = '#3e2723'; ctx.fillRect(12, 10, 18, 20); ctx.fillRect(34, 10, 18, 20);
+                ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(50, 32, 3, 0, Math.PI*2); ctx.fill(); 
+            }
+            else if (type === 'water') {
+                ctx.fillStyle = '#4040ff'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(10, 10, 10, 40); ctx.fillRect(30, 20, 5, 20);
+            }
+            else if (type === 'emerald') {
+                ctx.fillStyle = '#2e7d32'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#4caf50'; ctx.beginPath(); ctx.moveTo(32, 10); ctx.lineTo(54, 32); ctx.lineTo(32, 54); ctx.lineTo(10, 32); ctx.fill();
+                ctx.fillStyle = '#81c784'; ctx.fillRect(28, 28, 8, 8);
+            }
+            // --- UPDATED CROP TEXTURE ---
+            else if (type === 'crop') {
+                ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.clearRect(0,0,64,64);
+                // Draw wheat stalks
+                ctx.strokeStyle = '#d4c459';
+                ctx.lineWidth = 3;
+                for(let i=0; i<5; i++) {
+                    const x = 10 + i * 10;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 60);
+                    ctx.quadraticCurveTo(x + (Math.random()-0.5)*10, 30, x + (Math.random()-0.5)*20, 10);
+                    ctx.stroke();
+                    // Draw little "grains" at top
+                    ctx.fillStyle = '#e6ddc5';
+                    ctx.beginPath(); ctx.arc(x + (Math.random()-0.5)*20, 10, 3, 0, Math.PI*2); ctx.fill();
+                }
+            }
+            // --- END STONE ---
+            else if (type === 'end_stone') {
+                ctx.fillStyle = '#fcf8d2'; ctx.fillRect(0,0,64,64);
+                // Inverted noise (dark spots on light)
+                for (let i = 0; i < 400; i++) {
+                    ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.2})`;
+                    ctx.fillRect(Math.random()*64, Math.random()*64, 4, 4);
+                }
+            }
+            else if (type === 'packed_ice') {
+                // Match texture style
+                ctx.fillStyle = '#add8e6'; ctx.fillRect(0,0,64,64);
+                
+                // Draw crystal patterns
+                for(let i=0; i<20; i++) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.5})`;
+                    ctx.fillRect(Math.random()*50, Math.random()*50, Math.random()*15, Math.random()*15);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(2,2,60,60);
+            }
+            else if (type === 'snow_block') {
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64);
+                drawNoise('#ccddff', 0.2); // Subtle blue noise
+            }
+            else if (type === 'netherrack') { ctx.fillStyle = '#400000'; ctx.fillRect(0,0,64,64); drawNoise('#600000', 0.5); }
+            else if (type === 'glowstone') { ctx.fillStyle = '#ffcc00'; ctx.fillRect(0,0,64,64); drawNoise('#ffffaa', 0.3); }
+            else if (type === 'lava') { ctx.fillStyle = '#cf1020'; ctx.fillRect(0,0,64,64); }
+            else if (type === 'flint_and_steel') {
+                ctx.fillStyle = '#000'; ctx.fillRect(0,0,64,64); 
+                ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(32, 32, 20, Math.PI, 0); ctx.fill();
+                ctx.fillStyle = '#333'; ctx.fillRect(20, 32, 10, 10);
+            }
+            else if (type === 'blaze_rod') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(28, 10, 8, 44);
+                ctx.fillStyle = '#ffff00'; ctx.fillRect(30, 12, 4, 40);
+            }
+            else if (type === 'nether_brick') {
+                ctx.fillStyle = '#2a1a1a'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#4a2a2a';
+                ctx.fillRect(2, 2, 28, 18); ctx.fillRect(34, 2, 28, 18);
+                ctx.fillRect(0, 24, 14, 18); ctx.fillRect(18, 24, 28, 18); ctx.fillRect(50, 24, 14, 18);
+                ctx.fillRect(2, 46, 28, 18); ctx.fillRect(34, 46, 28, 18);
+            }
+            else if (type === 'spawner') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#1a1a2a'; 
+                ctx.fillRect(0,0,64,4); ctx.fillRect(0,60,64,4);
+                ctx.fillRect(0,0,4,64); ctx.fillRect(60,0,4,64);
+                ctx.fillRect(20,0,4,64); ctx.fillRect(40,0,4,64);
+                ctx.fillRect(0,20,64,4); ctx.fillRect(0,40,64,4);
+                ctx.fillStyle = '#ffaa00'; ctx.fillRect(26, 26, 12, 12);
+            }
+            // --- NETHER UPDATE ICONS ---
+            else if (type === 'quartz_ore') {
+                ctx.fillStyle = '#400000'; ctx.fillRect(0,0,64,64); // Netherrack base
+                ctx.fillStyle = '#e5e5e5'; // Quartz bits
+                ctx.beginPath(); ctx.moveTo(10,10); ctx.lineTo(20,30); ctx.lineTo(30,10); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(40,40); ctx.lineTo(50,60); ctx.lineTo(60,40); ctx.fill();
+                ctx.fillRect(30, 30, 10, 10);
+            }
+            else if (type === 'magma') {
+                ctx.fillStyle = '#501000'; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = '#ff4000'; // Hot cracks
+                for(let i=0; i<5; i++) {
+                    ctx.fillRect(Math.random()*50, Math.random()*50, Math.random()*20+5, Math.random()*5+2);
+                }
+            }
+            else if (type === 'red_mushroom') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#cc0000'; ctx.beginPath(); ctx.arc(32, 20, 16, Math.PI, 0); ctx.fill(); // Cap
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(28, 20, 8, 12); // Stem
+            }
+            else if (type === 'gold_nugget') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(32, 32, 10, 0, Math.PI*2); ctx.fill();
+            }
+            else if (type === 'quartz') {
+                ctx.clearRect(0,0,64,64);
+                ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(32,10); ctx.lineTo(52,32); ctx.lineTo(32,54); ctx.lineTo(12,32); ctx.fill();
+            }
+            else {
+                // Standard Block Noise Fallback
+                const colorMap = { 'dirt': '#5d4037', 'stone': '#808080', 'wood': '#4e342e', 'leaves': '#2e7d32', 'sand': '#e6ddc5', 'obsidian': '#1a1a2e' };
+                drawNoise(colorMap[type] || '#888');
+            }
+
+            const url = canvas.toDataURL();
+            iconCache[type] = url;
+            return url;
+        }
+        function updateHotbarVisuals() {
             const slots = document.querySelectorAll('.slot');
-            blockTypes.forEach((type, i) => {
-                if (i >= slots.length) return;
-                const qtyEl = slots[i].querySelector('.slot-qty');
-                if (gameMode === 'survival') {
+            
+            // 1. Render Standard Slots (0-8)
+            hotbarConfig.forEach((type, i) => {
+                if (i >= 9) return; // Only process first 9 slots from config
+                const slot = slots[i];
+                renderSlot(slot, type);
+            });
+
+            // 2. Render Host Slot (Index 9 / Slot 10)
+            const hostSlot = document.getElementById('slot10');
+            if (isHost) {
+                hostSlot.style.display = 'flex';
+                renderSlot(hostSlot, 'network_wand');
+            } else {
+                hostSlot.style.display = 'none';
+                hostSlot.classList.remove('active'); // Ensure it doesn't stay active if host status lost
+                if (currentBlockType === 'network_wand') {
+                    // If we lost host but were holding wand, switch to slot 1
+                    selectBlock(0);
+                }
+            }
+
+            // Helper to render individual slot
+            function renderSlot(slot, type) {
+                const qtyEl = slot.querySelector('.slot-qty');
+                if (slot.hasAttribute('id') && slot.id !== 'slot10') slot.removeAttribute('id'); // Remove legacy IDs (except slot10 if needed for CSS)
+
+                slot.style.background = 'rgba(0,0,0,0.3)';
+                if (type) {
+                    slot.style.backgroundImage = `url(${getIconDataUrl(type)})`;
+                    slot.style.backgroundSize = 'cover';
+                    slot.style.backgroundRepeat = 'no-repeat';
+                } else {
+                    slot.style.backgroundImage = 'none';
+                }
+
+                if (gameMode === 'survival' && type !== 'network_wand') {
                     const count = inventory[type] || 0;
                     qtyEl.innerText = count;
-                    if (count <= 0) slots[i].classList.add('empty-slot');
-                    else slots[i].classList.remove('empty-slot');
+                    if (count <= 0) slot.classList.add('empty-slot');
+                    else slot.classList.remove('empty-slot');
                 } else {
                     qtyEl.innerText = '';
-                    slots[i].classList.remove('empty-slot');
+                    slot.classList.remove('empty-slot');
                 }
-            });
+            }
+
+            // 3. Update Hand Material based on Active DOM Element
+            let activeSlotIndex = -1;
+            slots.forEach((s, i) => { if(s.classList.contains('active')) activeSlotIndex = i; });
+            
+            if(activeSlotIndex > -1) {
+                let type;
+                if (activeSlotIndex === 9) type = 'network_wand';
+                else type = hotbarConfig[activeSlotIndex];
+                
+                if(type) {
+                    currentBlockType = type;
+                    if (materials[type]) handMesh.material = materials[type];
+                }
+            }
+        }
+
+        function selectBlock(index) {
+            // Allow index 9 ONLY if host
+            if (index === 9 && !isHost) return;
+            if (index > 9) return;
+            
+            const slots = document.querySelectorAll('.slot');
+            slots.forEach(el => el.classList.remove('active'));
+            
+            if (slots[index]) {
+                slots[index].classList.add('active');
+                
+                let type;
+                if (index === 9) type = 'network_wand';
+                else type = hotbarConfig[index];
+                
+                if(type) {
+                    currentBlockType = type;
+                    if (materials[currentBlockType]) {
+                        handMesh.material = materials[currentBlockType];
+                    }
+                }
+            }
+        }
+
+        // Hook this into the main update loop or inventory update
+        function updateInventoryUI() {
+            updateHotbarVisuals();
         }
 
         function checkPortal(originX, originY, originZ) {
@@ -1380,6 +2660,148 @@
         function spawnPortal(cx, y, cz) {
             soundManager.playPortalOpen(); 
             for(let dx=-1; dx<=1; dx++) { for(let dz=-1; dz<=1; dz++) { placeBlockInteraction(cx + dx*BLOCK_SIZE, y, cz + dz*BLOCK_SIZE, 'portal'); } }
+        }
+
+        // --- NEW: PORTAL LINKING & GENERATION ---
+        const spawners = []; // Client-side spawners list
+
+        function findOrBuildPortal(x, y, z, destDim) {
+            const world = dimensions[destDim];
+            const ratio = destDim === 'the_nether' ? 0.125 : 8;
+            
+            // Calculate target coordinates
+            let tx = Math.round((x * ratio) / BLOCK_SIZE) * BLOCK_SIZE;
+            let tz = Math.round((z * ratio) / BLOCK_SIZE) * BLOCK_SIZE;
+            // Clamp Y (Nether ceiling is ~150, Overworld is ~200)
+            let ty = Math.max(10, Math.min(y, 120)); 
+            ty = Math.round(ty / BLOCK_SIZE) * BLOCK_SIZE;
+
+            // 1. Search for existing portal nearby (Radius 32 blocks)
+            let foundPortal = null;
+            const radius = 32 * BLOCK_SIZE;
+            
+            // Optimization: sparsely check chunks or iter
+            // Simple iter for this clone:
+            for(let sx = tx - radius; sx <= tx + radius; sx += BLOCK_SIZE*2) {
+                for(let sz = tz - radius; sz <= tz + radius; sz += BLOCK_SIZE*2) {
+                    for(let sy = ty - 20; sy <= ty + 20; sy += BLOCK_SIZE) {
+                        const k = getCoordsKey(sx, sy, sz);
+                        const b = world.data.get(k);
+                        if(b && b.userData.type === 'nether_portal') {
+                            // Found one!
+                            return { x: sx, y: sy, z: sz };
+                        }
+                    }
+                }
+            }
+
+            // 2. No portal found? Generate one at Target.
+            console.log(`Generating Portal in ${destDim} at ${tx}, ${ty}, ${tz}`);
+            generatePortalFrame(tx, ty, tz, destDim);
+            
+            return { x: tx + BLOCK_SIZE, y: ty + BLOCK_SIZE, z: tz }; // Teleport slightly inside
+        }
+
+        function generatePortalFrame(x, y, z, dim) {
+            // Clear area (3x4x3 volume) to prevent suffocation
+            for(let ix=-1; ix<=4; ix++) {
+                for(let iz=-2; iz<=2; iz++) {
+                    for(let iy=0; iy<=5; iy++) {
+                        const px = x + ix*BLOCK_SIZE; const py = y + iy*BLOCK_SIZE; const pz = z + iz*BLOCK_SIZE;
+                        const k = getCoordsKey(px, py, pz);
+                        const existing = dimensions[dim].data.get(k);
+                        if(existing && existing.userData.type !== 'bedrock') {
+                            removeBlock(existing);
+                        }
+                    }
+                }
+            }
+            // Create Platform if in air
+            for(let ix=-1; ix<=4; ix++) {
+                 for(let iz=-2; iz<=2; iz++) {
+                     const px = x + ix*BLOCK_SIZE; const pz = z + iz*BLOCK_SIZE;
+                     addBlock(px, y - BLOCK_SIZE, pz, 'obsidian', dim);
+                 }
+            }
+
+            // Build Frame (Axis aligned X)
+            const frame = [
+                [0,0], [1,0], [2,0], [3,0], // Bottom
+                [0,4], [1,4], [2,4], [3,4], // Top
+                [0,1], [0,2], [0,3],        // Left
+                [3,1], [3,2], [3,3]         // Right
+            ];
+            frame.forEach(p => {
+                addBlock(x + p[0]*BLOCK_SIZE, y + p[1]*BLOCK_SIZE, z, 'obsidian', dim);
+            });
+
+            // Fill Portal
+            for(let i=1; i<=2; i++) {
+                for(let j=1; j<=3; j++) {
+                    addBlock(x + i*BLOCK_SIZE, y + j*BLOCK_SIZE, z, 'nether_portal', dim);
+                }
+            }
+        }
+
+        function tryIgniteNetherPortal(x, y, z, dim) {
+            // Check for obsidian frame. 2x3 air gap required (4x5 external)
+            // We search for the bottom-left obsidian of the air gap
+            const world = dimensions[dim];
+            
+            // Search radius around click
+            for(let ox = x - 2*BLOCK_SIZE; ox <= x + 2*BLOCK_SIZE; ox += BLOCK_SIZE) {
+                for(let oz = z - 2*BLOCK_SIZE; oz <= z + 2*BLOCK_SIZE; oz += BLOCK_SIZE) {
+                    for(let oy = y - 1*BLOCK_SIZE; oy <= y + 1*BLOCK_SIZE; oy += BLOCK_SIZE) {
+                         // Check along X axis
+                         if (checkPortalFrame(ox, oy, oz, 1, 0, dim)) { spawnNetherPortal(ox, oy, oz, 1, 0, dim); return true; }
+                         // Check along Z axis
+                         if (checkPortalFrame(ox, oy, oz, 0, 1, dim)) { spawnNetherPortal(ox, oy, oz, 0, 1, dim); return true; }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function checkPortalFrame(x, y, z, dx, dz, dim) {
+            const world = dimensions[dim];
+            const getKey = (bx, by, bz) => getCoordsKey(bx, by, bz);
+            
+            // Check 2x3 Air Gap
+            for(let i=0; i<2; i++) {
+                for(let j=0; j<3; j++) {
+                    const k = getKey(x + (i*dx)*BLOCK_SIZE, y + j*BLOCK_SIZE, z + (i*dz)*BLOCK_SIZE);
+                    const b = world.data.get(k);
+                    if (b && b.userData.type !== 'air') return false;
+                }
+            }
+            // Check Frame (Obsidian)
+            // Bottom & Top
+            for(let i=-1; i<3; i++) {
+                const kb = getKey(x + (i*dx)*BLOCK_SIZE, y - BLOCK_SIZE, z + (i*dz)*BLOCK_SIZE);
+                const kt = getKey(x + (i*dx)*BLOCK_SIZE, y + 3*BLOCK_SIZE, z + (i*dz)*BLOCK_SIZE);
+                const bb = world.data.get(kb); const bt = world.data.get(kt);
+                if (!bb || bb.userData.type !== 'obsidian') return false;
+                if (!bt || bt.userData.type !== 'obsidian') return false;
+            }
+            // Sides
+            for(let j=0; j<3; j++) {
+                const k1 = getKey(x - dx*BLOCK_SIZE, y + j*BLOCK_SIZE, z - dz*BLOCK_SIZE);
+                const k2 = getKey(x + 2*dx*BLOCK_SIZE, y + j*BLOCK_SIZE, z + 2*dz*BLOCK_SIZE);
+                const b1 = world.data.get(k1); const b2 = world.data.get(k2);
+                if (!b1 || b1.userData.type !== 'obsidian') return false;
+                if (!b2 || b2.userData.type !== 'obsidian') return false;
+            }
+            return true;
+        }
+
+        function spawnNetherPortal(x, y, z, dx, dz, dim) {
+            soundManager.playPortalOpen();
+            for(let i=0; i<2; i++) {
+                for(let j=0; j<3; j++) {
+                    const px = x + (i*dx)*BLOCK_SIZE; const py = y + j*BLOCK_SIZE; const pz = z + (i*dz)*BLOCK_SIZE;
+                    placeBlockInteraction(px, py, pz, 'nether_portal');
+                }
+            }
         }
 
         // Explosions in singleplayer
@@ -1457,6 +2879,103 @@
             document.body.requestPointerLock();
         }
 
+        function toggleInventory() {
+            const menu = document.getElementById('inventory-menu');
+            const isHidden = menu.style.display === 'none' || menu.style.display === '';
+            
+            if (isHidden) {
+                renderInventoryMenu();
+                menu.style.display = 'block';
+                document.exitPointerLock();
+            } else {
+                menu.style.display = 'none';
+                document.body.requestPointerLock();
+            }
+        }
+
+        function renderInventoryMenu() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = '';
+
+            // Standard items only
+            let displayItems = [...allGameItems];
+
+            displayItems.forEach(type => {
+                const count = inventory[type] || 0;
+                if (gameMode === 'survival' && count <= 0) return;
+
+                const div = document.createElement('div');
+                div.className = 'inv-item';
+                if (selectedInventoryItem === type) div.classList.add('selected');
+                
+                div.innerHTML = `
+                    <div class="inv-name">${type.replace(/_/g, ' ')}</div>
+                    <div class="inv-count">${gameMode==='survival'?count:'∞'}</div>
+                `;
+                
+                div.style.backgroundImage = `url(${getIconDataUrl(type)})`;
+                div.style.backgroundSize = 'cover';
+                div.style.backgroundRepeat = 'no-repeat';
+                div.style.backgroundColor = 'rgba(0,0,0,0.5)';
+
+                div.onclick = () => {
+                    document.querySelectorAll('.inv-item').forEach(i => i.classList.remove('selected'));
+                    selectedInventoryItem = type;
+                    div.classList.add('selected');
+                };
+                grid.appendChild(div);
+            });
+        }
+
+        // --- TRADING LOGIC ---
+        let currentTraderId = null;
+
+        function closeTradeMenu() {
+            document.getElementById('trade-menu').style.display = 'none';
+            document.body.requestPointerLock();
+            
+            // Notify system that trading stopped
+            if (isConnected) {
+                ws.send(JSON.stringify({ type: 'trade_closed' }));
+            } else if (currentTraderId) {
+                // Singleplayer: Free the villager
+                const mob = mobs.find(m => m.id === currentTraderId);
+                if (mob) mob.isTrading = false;
+            }
+            
+            currentTraderId = null;
+        }
+
+        function sendTradeRequest(index) {
+            if (isConnected && currentTraderId) {
+                ws.send(JSON.stringify({ 
+                    type: 'trade_execute', 
+                    tradeIndex: index,
+                    traderId: currentTraderId // Send the specific villager ID
+                }));
+            }
+        }
+
+        function renderTradeMenu(trades) {
+            document.exitPointerLock();
+            const list = document.getElementById('trade-list');
+            list.innerHTML = '';
+            
+            trades.forEach((trade, index) => {
+                const div = document.createElement('div');
+                div.className = 'trade-item';
+                div.innerHTML = `
+                    <span class="trade-cost">${trade.costCount} ${trade.costItem}</span>
+                    <span class="trade-arrow">➔</span>
+                    <span class="trade-reward">${trade.rewardCount} ${trade.rewardItem}</span>
+                `;
+                div.onclick = () => sendTradeRequest(index);
+                list.appendChild(div);
+            });
+            
+            document.getElementById('trade-menu').style.display = 'block';
+        }
+
         function updateHealthUI() {
             const container = document.getElementById('health-container');
             if (gameMode === 'creative') {
@@ -1514,6 +3033,7 @@
                 ws.onclose = () => {
                     statusEl.innerText = "Status: Disconnected"; statusEl.style.color = "#aaa";
                     isConnected = false;
+                    isHost = false;
                     networkEntities.forEach(obj => { obj.mesh.parent.remove(obj.mesh); });
                     networkEntities.clear();
                     gameMode = 'creative'; 
@@ -1526,6 +3046,7 @@
         function handleNetworkMessage(data) {
             if (data.type === 'gamemode') {
                 gameMode = data.mode;
+                isHost = data.isHost;
                 if (gameMode === 'survival') {
                     isFlying = false;
                     myHealth = 20;
@@ -1551,10 +3072,15 @@
                 ds.style.display = 'block';
                 setTimeout(() => ds.style.display = 'none', 2000);
             }
+            else if (data.type === 'teleport') {
+                switchDimension(data.dim);
+                yawObject.position.set(data.x, data.y, data.z);
+                velocity.set(0, 0, 0);
+            }
             else if (data.type === 'block_update') {
                 const { x, y, z, blockType, dim } = data;
                 const world = dimensions[dim];
-                if (blockType === 'portal') {
+                if (blockType === 'portal' || blockType === 'nether_portal') {
                     const now = performance.now();
                     if (now > lastPortalSoundTime) { soundManager.playPortalOpen(); lastPortalSoundTime = now; }
                 }
@@ -1574,7 +3100,8 @@
                 } else {
                     const key = getCoordsKey(x, y, z);
                     if (world.data.has(key)) { const oldMesh = world.data.get(key); world.group.remove(oldMesh); const idx = world.objects.indexOf(oldMesh); if (idx > -1) world.objects.splice(idx, 1); world.data.delete(key); }
-                    addBlock(x, y, z, blockType, dim);
+                    // NEW: Add block WITH state from server
+                    addBlock(x, y, z, blockType, dim, data.state);
                 }
             }
             else if (data.type === 'world_sync') {
@@ -1589,11 +3116,6 @@
             else if (data.type === 'explosion') {
                 soundManager.playExplosion();
                 particleSystem.spawnExplosion(data.x, data.y, data.z, data.dim);
-            }
-            else if (data.type === 'mob_spawn') {
-                if (!mobs.find(m => m.mesh.position.x === data.x && m.mesh.position.z === data.z)) {
-                    spawnMob(data.x, data.y, data.z, data.mobType, data.dim, 'serverMob' + Math.random());
-                }
             }
             else if (data.type === 'update') {
                 const serverIds = new Set();
@@ -1618,7 +3140,11 @@
                 });
                 data.mobs.forEach(m => {
                     serverIds.add(m.id);
-                    if (!networkEntities.has(m.id)) { spawnMob(m.x, m.y, m.z, m.type, m.dim, m.id); networkEntities.get(m.id).health = m.health; }
+                    if (!networkEntities.has(m.id)) {
+                        const grp = spawnMob(m.x, m.y, m.z, m.type, m.dim, m.id);
+                        networkEntities.get(m.id).health = m.health;
+                        if (m.naturalSpawn) grp.userData.naturalSpawn = true;
+                    }
                     const mobObj = networkEntities.get(m.id);
                     if (mobObj.localDead) return; 
                     
@@ -1636,6 +3162,9 @@
             else if (data.type === 'entity_update') {
                 const netMob = networkEntities.get(data.mob.id);
                 if (netMob) {
+                    // Update state for visual effects
+                    netMob.isCharging = data.mob.isCharging; 
+
                     if (netMob.health > data.mob.health) {
                         const dist = Math.hypot(netMob.mesh.position.x-yawObject.position.x, netMob.mesh.position.y-yawObject.position.y, netMob.mesh.position.z-yawObject.position.z);
                         if (netMob.dim === currentDim && dist < 30) { soundManager.playDamage(); }
@@ -1650,13 +3179,80 @@
                         }
                     }
                 }
-            } else if (data.type === 'door_toggle') {
-                const key = getCoordsKey(data.x, data.y, data.z);
-                const world = dimensions[data.dim];
-                const mesh = world.data.get(key);
-                if (mesh) {
-                    toggleDoor(mesh, false);
+            } 
+            else if (data.type === 'spawner_particles') {
+                // Visuals for spawner active/spawn
+                particleSystem.spawnFlame(data.x, data.y, data.z, data.dim);
+            }
+            else if (data.type === 'projectile_update') {
+                // Sync Projectiles
+                const serverIds = new Set();
+                data.projectiles.forEach(p => {
+                    serverIds.add(p.id);
+                    let proj = projectiles.get(p.id);
+                    if (!proj) {
+                        // Create visual
+                        const geom = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+                        const mesh = new THREE.Mesh(geom, materials.fireball);
+                        mesh.position.set(p.x, p.y, p.z);
+                        dimensions[p.dim].group.add(mesh);
+                        proj = { mesh, dim: p.dim };
+                        projectiles.set(p.id, proj);
+                        
+                        // Play Shoot Sound at source
+                        const dist = Math.hypot(p.x - yawObject.position.x, p.y - yawObject.position.y, p.z - yawObject.position.z);
+                        if (dist < 30) soundManager.playFireball(dist);
+                    }
+                    
+                    // Update pos
+                    proj.mesh.position.set(p.x, p.y, p.z);
+                    proj.mesh.visible = (p.dim === currentDim);
+                    
+                    // Particle Trail
+                    if (p.dim === currentDim && Math.random() > 0.5) {
+                        const pm = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.3), new THREE.MeshBasicMaterial({color:0xffaa00}));
+                        pm.position.copy(proj.mesh.position);
+                        dimensions[currentDim].group.add(pm);
+                        particleSystem.particles.push({ mesh: pm, life: 0.5, vy: 0.5, dim: currentDim });
+                    }
+                });
+
+                // Cleanup missing
+                for (const [id, proj] of projectiles) {
+                    if (!serverIds.has(id)) {
+                        proj.mesh.parent.remove(proj.mesh);
+                        projectiles.delete(id);
+                        // Impact sound/particles?
+                    }
                 }
+            }
+            else if (data.type === 'door_toggle') {
+                // This case is redundant if we use the standard block_update flow, but kept for compatibility if server sends it
+                // However, server.js is updated to send standard 'block_update' with state.
+            } else if (data.type === 'open_trade') {
+                currentTraderId = data.traderId; // Store who we are trading with
+                renderTradeMenu(data.trades);
+            }
+            else if (data.type === 'trade_success') {
+                soundManager.playPlace(); // Satisfaction sound
+            }
+            else if (data.type === 'trade_fail') {
+                soundManager.playDamage(); // Error sound
+            }
+            else if (data.type === 'gamemode') {
+                gameMode = data.mode;
+                if (data.isHost !== undefined) {
+                     isHost = data.isHost;
+                     // If host, ensure wand is available in inventory logic (re-render handled by UI update)
+                }
+                
+                if (gameMode === 'survival') {
+                    isFlying = false;
+                    myHealth = 20;
+                    if (yawObject.position.y < 0) yawObject.position.set(0, 60, 0); // Safety teleport if falling
+                }
+                updateHealthUI();
+                updateInventoryUI(); // Refresh visuals
             }
         }
 
@@ -1667,6 +3263,9 @@
             raycaster.setFromCamera(center, camera);
             const world = getActiveWorld();
             
+            // --- NEW: REACH LIMIT ---
+            const maxReach = gameMode === 'survival' ? 5 : 50;
+
             // CHECK MOB HITS
             const entityMeshes = [];
             mobs.forEach(m => { if(!m.isDead && m.dim === currentDim) entityMeshes.push(m.mesh); });
@@ -1674,11 +3273,30 @@
 
             const entityIntersects = raycaster.intersectObjects(entityMeshes, true);
 
+            // Apply Reach Limit to Entity Interaction
             if (event.button === 0 && entityIntersects.length > 0 && entityIntersects[0].distance < 15) {
                 let hitObj = entityIntersects[0].object;
                 while(hitObj.parent && hitObj.parent.type !== 'Scene' && !hitObj.userData.isMob) { hitObj = hitObj.parent; }
                 
                 if (hitObj.userData.isMob) {
+                    // --- NEW: NETWORK WAND LOGIC ---
+                    // Check if local player is holding wand and is host
+                    if (isConnected && isHost && currentBlockType === 'network_wand') {
+                        // Find Network ID
+                        let targetId = null;
+                        for (const [id, net] of networkEntities) {
+                            if (net.mesh === hitObj) { targetId = id; break; }
+                        }
+                        
+                        if (targetId) {
+                            ws.send(JSON.stringify({ type: 'admin_gamemode_toggle', targetId: targetId }));
+                            // Visual feedback
+                            particleSystem.spawnExplosion(hitObj.position.x, hitObj.position.y + 3, hitObj.position.z, currentDim);
+                            soundManager.playDataConnect(); // Scifi sound
+                            return; // Don't deal damage
+                        }
+                    }
+
                     // Local Mob (Singleplayer)
                     const mob = mobs.find(m => m.mesh === hitObj);
                     if (mob && !isConnected) {
@@ -1689,10 +3307,24 @@
                         // Singleplayer Crystal Logic
                         if (mob.type === 'end_crystal') {
                              mob.health = 0;
-                             createExplosion(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, mob.dim, 6); // 6 Block radius
+                             createExplosion(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, mob.dim, 6); 
                         }
                         
-                        if(mob.health <= 0) { mob.isDead = true; dimensions[currentDim].group.remove(mob.mesh); }
+                        if(mob.health <= 0) { 
+                            mob.isDead = true; 
+                            dimensions[currentDim].group.remove(mob.mesh);
+                            
+                            // Blaze Drop (50% chance)
+                            if (mob.type === 'blaze' && Math.random() > 0.5 && gameMode === 'survival') {
+                                inventory['blaze_rod'] = (inventory['blaze_rod'] || 0) + 1;
+                                updateInventoryUI();
+                            }
+                            // Pigman Drop
+                            if (mob.type === 'pigman' && Math.random() > 0.5 && gameMode === 'survival') {
+                                inventory['gold_nugget'] = (inventory['gold_nugget'] || 0) + 1;
+                                updateInventoryUI();
+                            }
+                        }
                     } else {
                         // Network Mob
                         for (const [id, net] of networkEntities) {
@@ -1710,6 +3342,10 @@
             const intersects = raycaster.intersectObjects(world.objects);
             if (intersects.length > 0) {
                 const intersect = intersects[0]; const obj = intersect.object;
+
+                // --- NEW: BLOCK REACH CHECK ---
+                if (intersect.distance > maxReach * BLOCK_SIZE) return;
+
                 if (event.button === 0) { 
                     // CREATIVE MODE: Break instantly
                     // SURVIVAL MODE: Handled in animate() with delay
@@ -1718,9 +3354,72 @@
                     } 
                 } 
                 else if (event.button === 2) { 
+                    // --- NEW: SERVER ENTITY INTERACTION (TRADING) ---
+                    // Raycast for entities first
+                    const interactRay = new THREE.Raycaster();
+                    interactRay.setFromCamera(center, camera);
+                    
+                    // Filter for network entities (Server Mobs)
+                    const netMeshes = [];
+                    networkEntities.forEach(e => { if (e.dim === currentDim && !e.localDead) netMeshes.push(e.mesh); });
+                    
+                    const interactHits = interactRay.intersectObjects(netMeshes, true);
+
+                    let closestHit;
+                    let closestDist = Infinity;
+                    for (const hit of interactHits) {
+                        if (hit.distance < 5 * BLOCK_SIZE && hit.distance < closestDist) {
+                            closestDist = hit.distance;
+                            closestHit = hit;
+                        }
+                    }
+                    
+                    if (closestHit) {
+                        let target = closestHit.object;
+                        while(target.parent && target.parent.type !== 'Scene' && !target.userData.isMob) { target = target.parent; }
+                        
+                        // Only trigger if connected, survival, and target is villager
+                        if (isConnected && gameMode === 'survival' && target.userData.type === 'villager') {
+                            if (isConnected) {
+                                 // Multiplayer
+                                 for (const [id, val] of networkEntities) {
+                                     if (val.mesh === target) {
+                                         ws.send(JSON.stringify({ type: 'entity_interact', targetId: id }));
+                                         return; 
+                                     }
+                                 }
+                             } else {
+                                 // Singleplayer
+                                 const mob = mobs.find(m => m.mesh === target);
+                                 if (mob) {
+                                     mob.isTrading = true; // Freeze AI
+                                     currentTraderId = mob.id;
+                                     renderTradeMenu(mob.trades);
+                                     return;
+                                 }
+                             }
+                        }
+                    }
                     // Door Toggle Logic
                     if (obj.userData.type === 'door') {
-                        toggleDoor(obj);
+                        // If networked, send request to server. If singleplayer, update local.
+                        const newState = { open: !obj.userData.state.open };
+                        
+                        if (isConnected) {
+                            ws.send(JSON.stringify({ 
+                                type: 'block_state_update', 
+                                x: obj.position.x - (obj.userData.state.open ? 2 : 0), 
+                                y: obj.position.y, 
+                                z: obj.position.z - (obj.userData.state.open ? 2 : 0), 
+                                dim: currentDim,
+                                state: newState
+                            }));
+                            soundManager.playDoor();
+                        } else {
+                            // Singleplayer update
+                            updateBlockState(obj, newState);
+                            soundManager.playDoor();
+                        }
                         return;
                     }
 
@@ -1730,17 +3429,36 @@
                     }
                     if (currentBlockType === 'eye_of_ender') {
                         if (obj.userData.type === 'end_frame') {
-                            const pos = obj.position.clone(); breakBlockInteraction(obj); 
-                            setTimeout(() => { placeBlockInteraction(pos.x, pos.y, pos.z, 'end_frame_filled'); checkPortal(pos.x, pos.y, pos.z); }, 50); 
+                            activateEndFrameInteraction(obj);
                             return; 
                         }
                     }
+                    if (currentBlockType === 'flint_and_steel') {
+                        // Try to ignite portal if clicking obsidian
+                        if (obj.userData.type === 'obsidian') {
+                             if (isConnected) {
+                                 ws.send(JSON.stringify({ type: 'ignite_portal', x: obj.position.x, y: obj.position.y, z: obj.position.z, dim: currentDim }));
+                             } else {
+                                 if(tryIgniteNetherPortal(obj.position.x, obj.position.y, obj.position.z, currentDim)) {
+                                     // Success animation/sound
+                                 }
+                             }
+                        }
+                        return; // Don't place block
+                    }
                     if (currentBlockType === 'eye_of_ender') return;
+                    // --- NEW: PREVENT ITEM PLACEMENT ---
+                    if (['gold_nugget', 'quartz', 'blaze_rod', 'network_wand'].includes(currentBlockType)) return;
                     const pos = intersect.point.add(intersect.face.normal);
                     const x = Math.round(pos.x / BLOCK_SIZE) * BLOCK_SIZE; const y = Math.round(pos.y / BLOCK_SIZE) * BLOCK_SIZE; const z = Math.round(pos.z / BLOCK_SIZE) * BLOCK_SIZE;
                     const p = yawObject.position;
                     if (Math.abs(x - p.x) < BLOCK_SIZE && Math.abs(y - p.y) < BLOCK_SIZE * 2 && Math.abs(z - p.z) < BLOCK_SIZE) return;
-                    placeBlockInteraction(x, y, z, currentBlockType);
+                    
+                    // Initial State for placed blocks
+                    let initialState = {};
+                    if (currentBlockType === 'door') initialState = { open: false };
+                    
+                    placeBlockInteraction(x, y, z, currentBlockType, initialState);
                 }
             }
         });
@@ -1755,37 +3473,60 @@
         let prevTime = performance.now();
         let lastNetworkUpdate = 0;
 
-        function checkCactusDamageLocal(mob) {
+        function checkHazardDamageLocal(mob) {
             const world = getActiveWorld();
             const bx = Math.round(mob.mesh.position.x / BLOCK_SIZE) * BLOCK_SIZE;
-            const by = Math.round((mob.mesh.position.y - 10) / BLOCK_SIZE) * BLOCK_SIZE;
+            const by = Math.round(mob.mesh.position.y / BLOCK_SIZE) * BLOCK_SIZE;
             const bz = Math.round(mob.mesh.position.z / BLOCK_SIZE) * BLOCK_SIZE;
             
-            const nearbyOffsets = [
-                {x:0, y:0, z:0}, {x:1, y:0, z:0}, {x:-1, y:0, z:0},
-                {x:0, y:0, z:1}, {x:0, y:0, z:-1},
-                {x:0, y:1, z:0}, {x:0, y:-1, z:0}
-            ];
+            // Check immediate area
+            for (let ox = -1; ox <= 1; ox++) {
+                for (let oy = -2; oy <= 1; oy++) {
+                    for (let oz = -1; oz <= 1; oz++) {
+                         const blockX = bx + ox * BLOCK_SIZE;
+                         const blockY = by + oy * BLOCK_SIZE;
+                         const blockZ = bz + oz * BLOCK_SIZE;
+                         const k = getCoordsKey(blockX, blockY, blockZ);
+                         const mesh = world.data.get(k);
+                         
+                         if (mesh) {
+                             const type = mesh.userData.type;
+                             if (type === 'cactus' || type === 'magma' || type === 'lava') {
+                                 // AABB Collision (Entity width ~3, Block width 5)
+                                 // Distance between centers must be < (3/2 + 5/2) = 4
+                                 const dx = Math.abs(mob.mesh.position.x - blockX);
+                                 const dz = Math.abs(mob.mesh.position.z - blockZ);
+                                 const dy = mob.mesh.position.y - blockY; // Positive if mob is above block
 
-            for (let o of nearbyOffsets) {
-                const k = getCoordsKey(bx + o.x*BLOCK_SIZE, by + o.y*BLOCK_SIZE, bz + o.z*BLOCK_SIZE);
-                const mesh = world.data.get(k);
-                if (mesh && mesh.userData.type === 'cactus') {
-                    const dist = Math.hypot(mob.mesh.position.x - mesh.position.x, mob.mesh.position.z - mesh.position.z);
-                    if (dist < 6) { 
-                        const now = performance.now();
-                        if (now - mob.lastDamageTime > 500) {
-                            mob.health--;
-                            soundManager.playDamage();
-                            particleSystem.spawnDeath(mob.mesh.position.x, mob.mesh.position.y+3, mob.mesh.position.z, currentDim);
-                            mob.lastDamageTime = now;
-                            if (mob.health <= 0) {
-                                if (dimensions[currentDim]) {
-                                    dimensions[currentDim].group.remove(mob.mesh);
-                                }
-                                mob.isDead = true;
-                            }
-                        }
+                                 // Horizontal overlap
+                                 if (dx < 4 && dz < 4) {
+                                     let isHit = false;
+                                     // Vertical overlap (Standing on top OR inside)
+                                     // Standing on top: dy is approx 5. Inside: dy is approx 0.
+                                     if (type === 'magma' || type === 'lava') {
+                                         if (dy > -1 && dy < 6) isHit = true;
+                                     } 
+                                     // Cactus (Side collision only)
+                                     else if (type === 'cactus') {
+                                         if (dy > -1 && dy < 4) isHit = true;
+                                     }
+
+                                     if (isHit) {
+                                         const now = performance.now();
+                                         if (now - mob.lastDamageTime > 500) {
+                                            mob.health--;
+                                            soundManager.playDamage();
+                                            particleSystem.spawnDeath(mob.mesh.position.x, mob.mesh.position.y+3, mob.mesh.position.z, currentDim);
+                                            mob.lastDamageTime = now;
+                                            if (mob.health <= 0) {
+                                                if (dimensions[currentDim]) dimensions[currentDim].group.remove(mob.mesh);
+                                                mob.isDead = true;
+                                            }
+                                        }
+                                     }
+                                 }
+                             }
+                         }
                     }
                 }
             }
@@ -1823,37 +3564,89 @@
                 }
 
                 if (spawnY > -900) {
-                    spawnMob(checkX, spawnY, checkZ, 'zombie', 'overworld', 'clientMob');
+                    const grp = spawnMob(checkX, spawnY, checkZ, 'zombie', 'overworld', 'clientMob');
+                    // Tag natural spawn for burning logic
+                    grp.userData.naturalSpawn = true;
                 }
             }
         }
 
         function updatePhysics(delta) {
             const world = getActiveWorld();
-            velocity.x -= velocity.x * 10.0 * delta;
-            velocity.z -= velocity.z * 10.0 * delta;
-            if(isFlying) velocity.y -= velocity.y * 10.0 * delta;
-            else velocity.y -= 9.8 * 70.0 * delta;
+            
+            // --- LIQUID PHYSICS CHECK (Water & Lava) ---
+            const bx = Math.round(yawObject.position.x / BLOCK_SIZE) * BLOCK_SIZE;
+            const by = Math.round((yawObject.position.y - 10) / BLOCK_SIZE) * BLOCK_SIZE; // Feet
+            const bz = Math.round(yawObject.position.z / BLOCK_SIZE) * BLOCK_SIZE;
+            
+            const feetBlock = world.data.get(getCoordsKey(bx, by, bz));
+            const bodyBlock = world.data.get(getCoordsKey(bx, by + BLOCK_SIZE, bz));
+            
+            const isLiquid = (b) => b && (b.userData.type === 'water' || b.userData.type === 'lava');
+            const inLiquid = isLiquid(feetBlock) || isLiquid(bodyBlock);
+            
+            // LAVA DAMAGE (Survival)
+            // MAGMA & LAVA DAMAGE
+            const isMagma = (b) => b && b.userData.type === 'magma';
+            const onHazard = (isLiquid(feetBlock) && feetBlock.userData.type === 'lava') || 
+                             (isLiquid(bodyBlock) && bodyBlock.userData.type === 'lava') ||
+                             (isMagma(feetBlock)); // Stand on magma
+
+            if (gameMode === 'survival' && onHazard) {
+                const now = performance.now();
+                if (now - lastDamageTime > 500) {
+                     myHealth--;
+                     soundManager.playDamage();
+                     updateHealthUI();
+                     lastDamageTime = now;
+                     if (myHealth <= 0) {
+                         myHealth = 20; updateHealthUI(); yawObject.position.set(0, 60, 0);
+                         const ds = document.getElementById('death-screen');
+                         ds.style.display = 'block'; setTimeout(() => ds.style.display = 'none', 2000);
+                     }
+                }
+            }
+
+            // Physics Simulation
+            if (inLiquid) {
+                // Fluid Drag & Buoyancy
+                velocity.x -= velocity.x * 5.0 * delta; 
+                velocity.z -= velocity.z * 5.0 * delta;
+                velocity.y -= velocity.y * 5.0 * delta; 
+            } else {
+                // Air/Ground Friction
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                
+                if(isFlying) velocity.y -= velocity.y * 10.0 * delta;
+                else velocity.y -= 9.8 * 70.0 * delta; // Normal Gravity
+            }
 
             direction.z = Number(moveForward) - Number(moveBackward);
             direction.x = Number(moveRight) - Number(moveLeft);
             direction.normalize();
 
-            let isMoving = false;
             if (moveForward || moveBackward || moveLeft || moveRight) {
-                isMoving = true;
                 const input = new THREE.Vector3(direction.x, 0, -direction.z);
                 input.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObject.rotation.y);
-                const speed = moveDown ? 150.0 : 400.0; // Slower when sneaking
+                
+                let speed = moveDown ? 150.0 : 400.0;
+                if (inLiquid) speed *= 0.4; // Slow down in liquid
+                
                 velocity.x += input.x * speed * delta;
                 velocity.z += input.z * speed * delta;
             }
+            
             if (isFlying) {
                 if (moveUp) velocity.y += 400 * delta;
                 if (moveDown) velocity.y -= 400 * delta;
+            } else if (inLiquid) {
+                if (moveUp) velocity.y += 300 * delta; // Swim up
+            } else if (moveUp && !inLiquid) {
+                // Jump handled below
             }
             
-            // Crouching Camera Height
+            // Crouch Height
             const targetHeight = moveDown && !isFlying ? 25 : 30;
             yawObject.position.y += (targetHeight - (yawObject.position.y - (pitchObject.position.y + (yawObject.position.y - 30)))) * 0.2; 
             pitchObject.position.y += ( (moveDown && !isFlying ? -5 : 0) - pitchObject.position.y ) * 0.2;
@@ -1865,25 +3658,54 @@
             if (!isFlying) {
                 const portalRay = new THREE.Raycaster(yawObject.position, new THREE.Vector3(0, -1, 0), 0, 12);
                 const portalHits = portalRay.intersectObjects(world.objects);
-                const inPortal = portalHits.some(h => h.object.userData.type === 'portal' && h.distance < 12);
-                if (inPortal) { switchDimension(currentDim === 'overworld' ? 'the_end' : 'overworld'); return; }
+                const portalHit = portalHits.find(h => (h.object.userData.type === 'portal' || h.object.userData.type === 'nether_portal') && h.distance < 12);
+                
+                if (portalHit) { 
+                    const now = performance.now();
+                    if (now - lastPlayerPortalTime > 3000) {
+                        const t = portalHit.object.userData.type;
+                        
+                        // Multiplayer: Request Server to Teleport
+                        if (isConnected) {
+                            let targetDim = currentDim;
+                            if (t === 'portal') targetDim = currentDim === 'overworld' ? 'the_end' : 'overworld';
+                            if (t === 'nether_portal') targetDim = currentDim === 'overworld' ? 'the_nether' : 'overworld';
+                            
+                            ws.send(JSON.stringify({ type: 'portal_travel', destDim: targetDim, portalType: t }));
+                            lastPlayerPortalTime = now;
+                            return;
+                        }
+
+                        // Singleplayer: Local Logic
+                        if (t === 'portal') {
+                             switchDimension(currentDim === 'overworld' ? 'the_end' : 'overworld');
+                        }
+                        if (t === 'nether_portal') {
+                            const targetDim = currentDim === 'overworld' ? 'the_nether' : 'overworld';
+                            const dest = findOrBuildPortal(yawObject.position.x, yawObject.position.y, yawObject.position.z, targetDim);
+                            switchDimension(targetDim);
+                            yawObject.position.set(dest.x, dest.y, dest.z);
+                        }
+                        lastPlayerPortalTime = now;
+                        return; 
+                    }
+                }
 
                 const offsets = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 0, 2), new THREE.Vector3(-2, 0, 2), new THREE.Vector3(2, 0, -2), new THREE.Vector3(-2, 0, -2)];
                 let groundY = -Infinity; let found = false;
                 for(let o of offsets) {
                     const origin = yawObject.position.clone().add(o); const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 12);
-                    const hits = ray.intersectObjects(world.objects); const validHit = hits.find(h => h.object.userData.type !== 'portal');
+                    const hits = ray.intersectObjects(world.objects); 
                     
-                    // --- COLLISION CHECK (Ignore 'crop' blocks AND Open Doors) ---
+                    // FIX: Find first SOLID block (Ignore crop, water, portal, open door)
+                    const validHit = hits.find(h => {
+                         const t = h.object.userData.type;
+                         const isOpenDoor = (t === 'door' && h.object.userData.state && h.object.userData.state.open);
+                         return t !== 'portal' && t !== 'nether_portal' && t !== 'crop' && t !== 'water' && t !== 'lava' && !isOpenDoor;
+                    });
+                    
                     if (validHit) { 
-                        if(validHit.object.userData.type !== 'crop') {
-                            // If it's a door, check if open
-                            if (validHit.object.userData.type === 'door' && validHit.object.userData.isOpen) {
-                                // Pass through
-                            } else {
-                                if(validHit.point.y > groundY) { groundY = validHit.point.y; found = true; } 
-                            }
-                        }
+                        if(validHit.point.y > groundY) { groundY = validHit.point.y; found = true; } 
                     }
                 }
                 if (found) {
@@ -1901,7 +3723,12 @@
                         const origin = new THREE.Vector3(testX, yawObject.position.y, testZ).add(o); 
                         const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 12);
                         const hits = ray.intersectObjects(world.objects); 
-                        const validHit = hits.find(h => h.object.userData.type !== 'portal');
+                        // FIX: Ignore non-solids for bridging check
+                        const validHit = hits.find(h => {
+                             const t = h.object.userData.type;
+                             const isOpenDoor = (t === 'door' && h.object.userData.state && h.object.userData.state.open);
+                             return t !== 'portal' && t !== 'nether_portal' && t !== 'crop' && t !== 'water' && t !== 'lava' && !isOpenDoor;
+                        });
                         if (validHit) { safe = true; break; }
                     }
                     if (!safe) { velocity.x = 0; velocity.z = 0; }
@@ -1910,34 +3737,29 @@
 
             // Hand Bobbing
             const time = performance.now() / 1000;
+            
+            const isMoving = (moveForward || moveBackward || moveLeft || moveRight);
             if (isMoving) {
                 handGroup.position.y = -0.6 + Math.sin(time * 10) * 0.05;
                 handGroup.position.x = 0.8 + Math.cos(time * 10) * 0.05;
             } else {
-                // Idle sway
                 handGroup.position.y = -0.6 + Math.sin(time * 2) * 0.02;
                 handGroup.position.x = 0.8;
             }
-            
-            // Hand Mining Animation
-            if (isMouseDown) {
-                handGroup.rotation.x = -0.5 + Math.sin(time * 20) * 0.5; // Fast punch
-            } else {
-                handGroup.rotation.x = 0;
-            }
+            if (isMouseDown) { handGroup.rotation.x = -0.5 + Math.sin(time * 20) * 0.5; } 
+            else { handGroup.rotation.x = 0; }
 
             if (isMoving && onGround && !isFlying) {
                 const dist = yawObject.position.distanceTo(new THREE.Vector3(intendedX, yawObject.position.y, intendedZ)); 
                 walkedDistance += dist;
                 if (walkedDistance > 15) { 
-                    // --- DETECT BLOCK UNDER FEET FOR SOUND ---
                     const origin = yawObject.position.clone();
                     const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 15);
                     const hits = ray.intersectObjects(world.objects);
                     let type = 'grass';
                     if (hits.length > 0) {
-                         // Find top-most non-crop block
-                         const hit = hits.find(h => h.object.userData.type !== 'crop');
+                         // Find top-most solid block
+                         const hit = hits.find(h => h.object.userData.type !== 'crop' && h.object.userData.type !== 'water');
                          if(hit) type = hit.object.userData.type || 'grass';
                     }
                     soundManager.playFootstep(type); 
@@ -1946,20 +3768,17 @@
             }
             
             // COLLISION DETECTION FOR MOVEMENT
-            // Simple wall collision prevention
-            if(!isFlying && !controls.isLocked) {
-                // Just update position if not colliding
-            }
+            if(!isFlying && !controls.isLocked) { } // Placeholder
             if(!isFlying) {
                const testDir = velocity.clone().normalize();
                const wallRay = new THREE.Raycaster(yawObject.position, testDir, 0, 3);
                const wallHits = wallRay.intersectObjects(world.objects);
                
-               // Check if hit is solid (not crop, not open door)
+               // FIX: Wall collision ignores liquids/portals
                const solidWall = wallHits.find(h => {
                    const t = h.object.userData.type;
-                   const isOpenDoor = (t === 'door' && h.object.userData.isOpen);
-                   return t !== 'crop' && t !== 'portal' && !isOpenDoor;
+                   const isOpenDoor = (t === 'door' && h.object.userData.state && h.object.userData.state.open);
+                   return t !== 'crop' && t !== 'water' && t !== 'lava' && t !== 'portal' && t !== 'nether_portal' && !isOpenDoor;
                });
 
                if(solidWall) {
@@ -1972,53 +3791,243 @@
             if (yawObject.position.y < -100) { yawObject.position.set(0, 50, 0); velocity.set(0, 0, 0); if(currentDim === 'the_end') switchDimension('overworld'); }
         }
 
+        // --- HELPER: Client-side Roof Check ---
+        function isLocationIndoors(x, y, z, dim) {
+            const world = dimensions[dim];
+            const bx = Math.round(x / BLOCK_SIZE) * BLOCK_SIZE;
+            const bz = Math.round(z / BLOCK_SIZE) * BLOCK_SIZE;
+            const startY = Math.round(y / BLOCK_SIZE) * BLOCK_SIZE;
+
+            for(let i = 1; i <= 5; i++) {
+                const checkY = startY + (i * BLOCK_SIZE);
+                const k = getCoordsKey(bx, checkY, bz);
+                const mesh = world.data.get(k);
+                // Check if mesh exists and is not leaves
+                if (mesh && mesh.userData.type !== 'leaves' && mesh.userData.type !== 'barrier') {
+                    return true; 
+                }
+            }
+            return false;
+        }
+        
+        // --- HELPER: Check for Direct Sunlight (High sky check) ---
+        function isExposedToSun(x, y, z, dim) {
+            const world = dimensions[dim];
+            const bx = Math.round(x / BLOCK_SIZE) * BLOCK_SIZE;
+            const bz = Math.round(z / BLOCK_SIZE) * BLOCK_SIZE;
+            const startY = Math.round(y / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE;
+            
+            // Check up to height 200
+            for(let checkY = startY; checkY < 200; checkY += BLOCK_SIZE) {
+                const k = getCoordsKey(bx, checkY, bz);
+                const mesh = world.data.get(k);
+                if (mesh && mesh.userData.type !== 'air' && mesh.userData.type !== 'barrier') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         function updateMobs(delta) {
             const currentTime = performance.now();
+            // ... (Network entity visibility code remains same) ...
             for (const [key, entity] of networkEntities) {
                 if (entity.dim !== currentDim) { entity.mesh.visible = false; continue; }
                 entity.mesh.visible = true;
+
+                // FIX: Add Ambient Sounds for Multiplayer Entities
+                if (!entity.lastGruntTime) entity.lastGruntTime = 0; // Initialize if missing
+
+                if (currentTime - entity.lastGruntTime > 2000 + Math.random() * 5000) {
+                    const dist = entity.mesh.position.distanceTo(yawObject.position);
+                    const type = entity.mesh.userData.type; // Get type from mesh
+                    
+                    if (dist < 20) { 
+                        if (type === 'zombie') soundManager.playZombie(dist); 
+                        if (type === 'villager') soundManager.playVillager(dist); 
+                    }
+                    entity.lastGruntTime = currentTime;
+                }
             }
-            // Crystal Animation (should be animated online too)
-            mobs.filter(m=>m.type === 'end_crystal').forEach(mob=>{
-                if (mob.dim !== currentDim || mob.isDead) { mob.mesh.visible = false; return; }
-                const rot = mob.mesh.getObjectByName('rotator');
-                const rot2 = mob.mesh.getObjectByName('rotator2');
-                if (rot) { rot.rotation.y += delta; rot.rotation.x += delta * 0.5; }
-                if (rot2) { rot2.rotation.y -= delta; }
+            // Crystal & Blaze Animation
+            mobs.forEach(mob => {
+                if (mob.dim !== currentDim || mob.isDead) return;
                 
-                const yOffset = Math.sin(performance.now() / 500) * 0.5;
-                if (rot) rot.position.y = 2.5 + yOffset;
-                if (rot2) rot2.position.y = 2.5 + yOffset;
-                return;
+                if (mob.type === 'end_crystal') {
+                    const rot = mob.mesh.getObjectByName('rotator');
+                    const rot2 = mob.mesh.getObjectByName('rotator2');
+                    if (rot) { rot.rotation.y += delta; rot.rotation.x += delta * 0.5; }
+                    if (rot2) { rot2.rotation.y -= delta; }
+                    const yOffset = Math.sin(performance.now() / 500) * 0.5;
+                    if (rot) rot.position.y = 2.5 + yOffset;
+                    if (rot2) rot2.position.y = 2.5 + yOffset;
+                }
+                
+                if (mob.type === 'blaze') {
+                    const rods = mob.mesh.getObjectByName('blaze_rods');
+                    if (rods) {
+                        // Spin faster if charging
+                        const speed = mob.isCharging ? 15 : 3;
+                        rods.rotation.y += delta * speed;
+                    }
+                    // Hover effect
+                    mob.mesh.position.y += Math.sin(performance.now() / 300) * 0.02;
+
+                    // Charging Particles (Smoke)
+                    if (mob.isCharging && Math.random() < 0.2) {
+                        const sm = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({color: 0x333333}));
+                        sm.position.set(
+                            mob.mesh.position.x + (Math.random()-0.5)*2,
+                            mob.mesh.position.y + 4 + (Math.random()-0.5)*2,
+                            mob.mesh.position.z + (Math.random()-0.5)*2
+                        );
+                        dimensions[mob.dim].group.add(sm);
+                        particleSystem.particles.push({ mesh: sm, life: 1.0, vy: 2, dim: mob.dim });
+                    }
+                }
             });
+            
+            // Network Entity effects (Charging)
+            networkEntities.forEach(netMob => {
+                if (netMob.mesh.userData.type === 'blaze' && netMob.isCharging && netMob.dim === currentDim) {
+                     const rods = netMob.mesh.getObjectByName('blaze_rods');
+                     if (rods) rods.rotation.y += delta * 15;
+                     
+                     if (Math.random() < 0.2) {
+                        const sm = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({color: 0x333333}));
+                        sm.position.set(
+                            netMob.mesh.position.x + (Math.random()-0.5)*2,
+                            netMob.mesh.position.y + 4 + (Math.random()-0.5)*2,
+                            netMob.mesh.position.z + (Math.random()-0.5)*2
+                        );
+                        dimensions[netMob.dim].group.add(sm);
+                        particleSystem.particles.push({ mesh: sm, life: 1.0, vy: 2, dim: netMob.dim });
+                     }
+                }
+            });
+
             if (!isConnected) {
+                // Filter out dead mobs (keep them until they turn invisble for the above logic to make them invisible)
+                mobs = mobs.filter(m=>!m.isDead || m.mesh.visible);
                 mobs.forEach(mob => {
                     if (mob.type === 'end_crystal') return; // Don't do normal mob logic for end crystals
                     if (mob.dim !== currentDim || mob.isDead) { mob.mesh.visible = false; return; }
+
+                    // --- NEW: ENTITY PORTAL LOGIC (SINGLEPLAYER) ---
+                    if (!isConnected && mob.type !== 'end_crystal') {
+                        if (!mob.lastPortalTime) mob.lastPortalTime = 0;
+                        const now = performance.now();
+                        
+                        if (now - mob.lastPortalTime > 3000) {
+                            const bx = Math.round(mob.mesh.position.x / BLOCK_SIZE) * BLOCK_SIZE;
+                            const by = Math.round(mob.mesh.position.y / BLOCK_SIZE) * BLOCK_SIZE;
+                            const bz = Math.round(mob.mesh.position.z / BLOCK_SIZE) * BLOCK_SIZE;
+                            const k = getCoordsKey(bx, by, bz);
+                            const block = dimensions[mob.dim].data.get(k);
+
+                            if (block && (block.userData.type === 'portal' || block.userData.type === 'nether_portal')) {
+                                const oldDim = mob.dim;
+                                let newDim = 'overworld';
+                                let destPos = {x:0, y:60, z:0};
+
+                                if (block.userData.type === 'portal') {
+                                    newDim = oldDim === 'overworld' ? 'the_end' : 'overworld';
+                                    destPos = {x:0, y:60, z:0};
+                                } else {
+                                    newDim = oldDim === 'overworld' ? 'the_nether' : 'overworld';
+                                    destPos = findOrBuildPortal(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, newDim);
+                                }
+                                
+                                dimensions[oldDim].group.remove(mob.mesh);
+                                dimensions[newDim].group.add(mob.mesh);
+                                
+                                mob.dim = newDim;
+                                mob.mesh.position.set(destPos.x, destPos.y, destPos.z);
+                                mob.velocity.set(0, 0, 0);
+                                mob.lastPortalTime = now;
+                                soundManager.playTeleport();
+                            }
+                        }
+                    }
                     
-                    checkCactusDamageLocal(mob);
+                    // --- NEW: Update Villager AI ---
+                    if (mob.type === 'villager') updateVillagerAI(mob, delta, worldTimeRatio);
                     
+                    checkHazardDamageLocal(mob);
+                    
+                    // --- ZOMBIE SUNLIGHT BURNING (SINGLEPLAYER) ---
+                    const isDay = worldTimeRatio < 0.45 || worldTimeRatio > 0.95;
+                    // Check tag 'userData.naturalSpawn'
+                    if (isDay && mob.type === 'zombie' && mob.mesh.userData.naturalSpawn && mob.dim === 'overworld') {
+                        if (isExposedToSun(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, mob.dim)) {
+                            if (currentTime - mob.lastDamageTime > 500) {
+                                mob.health--;
+                                soundManager.playDamage();
+                                // Re-use death particles for burning effect
+                                particleSystem.spawnDeath(mob.mesh.position.x, mob.mesh.position.y+3, mob.mesh.position.z, mob.dim);
+                                mob.lastDamageTime = currentTime;
+                                if (mob.health <= 0) {
+                                    mob.isDead = true;
+                                    dimensions[currentDim].group.remove(mob.mesh);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Grunt sounds (Keep existing)
                     if (currentTime - mob.lastGruntTime > 2000 + Math.random() * 5000) {
                         const dist = mob.mesh.position.distanceTo(yawObject.position);
-                        if (dist < 20) { if (mob.type === 'zombie') soundManager.playZombie(dist); if (mob.type === 'villager') soundManager.playVillager(dist); }
+                        if (dist < 20) { 
+                            if (mob.type === 'zombie') soundManager.playZombie(dist); 
+                            if (mob.type === 'villager') soundManager.playVillager(dist);
+                            if (mob.type === 'blaze') soundManager.playBlaze(dist);
+                            if (mob.type === 'pigman') soundManager.playPigman(dist);
+                        }
                         mob.lastGruntTime = currentTime;
                     }
                     mob.mesh.visible = true; mob.mesh.position.add(mob.velocity.clone().multiplyScalar(delta));
                     
-                    // Local Client AI (simplified)
+                    // --- TARGET SELECTION ---
                     let target = null; let minDist = 100; 
                     if (mob.type === 'zombie') {
+                
+                    // 1. SELF CHECK: Am I glitching inside a house?
+                    if (Math.random() < 0.1 && isLocationIndoors(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, currentDim)) {
+                        // Panic! Reverse direction or move randomly to get out
+                        mob.velocity.x = (Math.random() - 0.5) * 30;
+                        mob.velocity.z = (Math.random() - 0.5) * 30;
+                        target = null;
+                    } else {
+                        // 2. FIND TARGETS (Only if they are OUTSIDE)
+                        
+                        // Check Villagers
                         mobs.forEach(other => {
                             if (other.type === 'villager' && !other.isDead && other.dim === currentDim) {
                                 const dist = mob.mesh.position.distanceTo(other.mesh.position);
-                                if (dist < minDist) { minDist = dist; target = other.mesh.position; }
+                                // Condition: Victim must NOT be indoors
+                                if (dist < minDist && !isLocationIndoors(other.mesh.position.x, other.mesh.position.y, other.mesh.position.z, currentDim)) { 
+                                    minDist = dist; target = other.mesh.position; 
+                                }
                             }
                         });
+                    
+                        // Check Player (Survival)
                         if (gameMode === 'survival' && currentDim === mob.dim) {
-                             const dist = mob.mesh.position.distanceTo(yawObject.position);
-                             if (dist < minDist) { minDist = dist; target = yawObject.position; }
+                            const dist = mob.mesh.position.distanceTo(yawObject.position);
+                            
+                            // Zombies only target outdoors, Blazes target anywhere line-of-sight (simplified to distance here)
+                            const isValidTarget = (mob.type === 'blaze') || !isLocationIndoors(yawObject.position.x, yawObject.position.y, yawObject.position.z, currentDim);
+                            
+                            if (dist < minDist && isValidTarget) { 
+                                minDist = dist; target = yawObject.position; 
+                            }
+                        }
+                        // Check Player (Creative/General Look for Blaze)
+                        if (mob.type === 'blaze' && !target) {
+                            target = yawObject.position; // Just look at player always in SP
                         }
 
+                        // Attack Logic (Keep existing)
                         if (minDist < 3 && target) {
                             if (target === yawObject.position) {
                                 if (currentTime - mob.lastAttackTime > 1000) {
@@ -2047,32 +4056,89 @@
                                 }
                             }
                         }
+                    }
                     } else {
-                        // Villager Logic
+                        // Villager/Pigman Logic
                         mobs.forEach(other => { if (other.type === 'zombie' && !other.isDead && other.dim === currentDim) { const dist = mob.mesh.position.distanceTo(other.mesh.position); if (dist < minDist) { minDist = dist; target = other.mesh.position; } } });
+                        // Pigman retaliation
+                        if (mob.type === 'pigman' && target) {
+                             // Pigmen attack zombies if close
+                        }
                     }
 
                     const speed = mob.type === 'zombie' ? 15 : 20; 
                     const moveDir = new THREE.Vector3(0, 0, 0);
-                    if (target) {
+                    // Zombie/Flee AI
+                    if (target && mob.type !== 'villager') { 
                         if (mob.type === 'zombie') { moveDir.subVectors(target, mob.mesh.position).normalize(); } 
-                        else { moveDir.subVectors(mob.mesh.position, target).normalize(); }
+                        
+                        // Blaze & Pigman Look Logic
+                        if ((mob.type === 'blaze' || mob.type === 'pigman') && target) {
+                             mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z);
+                        }
+
                         const lookAheadDist = 4; const checkPos = mob.mesh.position.clone().add(moveDir.clone().multiplyScalar(lookAheadDist)).add(new THREE.Vector3(0, 5, 0));
                         const cliffRay = new THREE.Raycaster(checkPos, new THREE.Vector3(0, -1, 0), 0, 15); const groundHits = cliffRay.intersectObjects(getActiveWorld().objects);
                         if (groundHits.length > 0) {
-                            if (mob.type === 'zombie') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z); else mob.mesh.lookAt(mob.mesh.position.x + moveDir.x, mob.mesh.position.y, mob.mesh.position.z + moveDir.z);
-                            mob.velocity.x = moveDir.x * speed; mob.velocity.z = moveDir.z * speed;
-                        } else { mob.velocity.x = 0; mob.velocity.z = 0; }
-                    } else { mob.velocity.x *= 0.9; mob.velocity.z *= 0.9; }
+                            if (mob.type === 'zombie' || mob.type === 'pigman') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z); 
+                            
+                            // Only apply walking velocity if NOT a blaze (Blaze hovers separately)
+                            if (mob.type !== 'blaze') {
+                                mob.velocity.x = moveDir.x * speed; mob.velocity.z = moveDir.z * speed;
+                            }
+                        } else if (mob.type !== 'blaze') { mob.velocity.x = 0; mob.velocity.z = 0; }
+                    } else if (mob.type !== 'villager' && mob.type !== 'blaze') { mob.velocity.x *= 0.9; mob.velocity.z *= 0.9; }
                     
-                    mob.velocity.y -= 9.8 * 50.0 * delta;
-                    if (target && (mob.velocity.x !== 0 || mob.velocity.z !== 0)) {
-                        const forwardRay = new THREE.Raycaster(mob.mesh.position, moveDir.normalize(), 0, 4);
-                        if (forwardRay.intersectObjects(getActiveWorld().objects).length > 0 && mob.velocity.y <= 0) { mob.velocity.y = 60; }
+                    // PHYSICS & GRAVITY
+                    if (mob.type === 'blaze') {
+                        // BLAZE HOVER PHYSICS
+                        const time = performance.now() / 1000;
+                        mob.velocity.y = Math.sin(time * 2) * 2.0; // Bobbing
+                        
+                        // Maintain height
+                        const origin = mob.mesh.position.clone();
+                        const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 20);
+                        const hits = ray.intersectObjects(getActiveWorld().objects);
+                        let groundY = -100;
+                        for(let h of hits) {
+                             if(h.object.userData.type !== 'air' && h.object.userData.type !== 'crop') { groundY = h.point.y; break; }
+                        }
+                        // Fly up if too close to ground
+                        if (mob.mesh.position.y < groundY + 10) mob.velocity.y += 10;
+                        
+                        // Apply Move Dir if active (simple approach or just hover)
+                        if (target) {
+                             const dir = new THREE.Vector3().subVectors(target, mob.mesh.position).normalize();
+                             mob.mesh.position.x += dir.x * 10 * delta;
+                             mob.mesh.position.z += dir.z * 10 * delta;
+                        }
+                        
+                        mob.mesh.position.y += mob.velocity.y * delta;
+                    } 
+                    else {
+                        // STANDARD GRAVITY
+                        mob.velocity.y -= 9.8 * 50.0 * delta;
+                        if (target && (mob.velocity.x !== 0 || mob.velocity.z !== 0) && mob.type !== 'villager') {
+                            const forwardRay = new THREE.Raycaster(mob.mesh.position, moveDir.normalize(), 0, 4);
+                            const hits = forwardRay.intersectObjects(getActiveWorld().objects);
+                            const solidHit = hits.find(h => h.object.userData.type !== 'crop' && h.object.userData.type !== 'water');
+                            if (solidHit && mob.velocity.y <= 0) { mob.velocity.y = 60; }
+                        }
+                        mob.mesh.position.add(mob.velocity.clone().multiplyScalar(delta));
+                        const origin = mob.mesh.position.clone().add(new THREE.Vector3(0, 3, 0)); const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 10); const hits = ray.intersectObjects(getActiveWorld().objects);
+                        
+                        // Find ground
+                        let groundHit = null;
+                        for (let h of hits) {
+                            const t = h.object.userData.type;
+                            if (t !== 'crop' && !t.includes('door') && t !== 'air' && t !== 'water' && t !== 'lava') {
+                                groundHit = h;
+                                break;
+                            }
+                        }
+
+                        if(groundHit) { const groundY = groundHit.point.y; const dist = mob.mesh.position.y - groundY; if (dist < 1.0 && dist > -5.0 && mob.velocity.y <= 0) { mob.velocity.y = 0; mob.mesh.position.y = groundY; } }
                     }
-                    mob.mesh.position.add(mob.velocity.clone().multiplyScalar(delta));
-                    const origin = mob.mesh.position.clone().add(new THREE.Vector3(0, 3, 0)); const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 10); const hits = ray.intersectObjects(getActiveWorld().objects);
-                    if(hits.length > 0) { const groundY = hits[0].point.y; const dist = mob.mesh.position.y - groundY; if (dist < 1.0 && dist > -5.0 && mob.velocity.y <= 0) { mob.velocity.y = 0; mob.mesh.position.y = groundY; } }
                     if(mob.mesh.position.y < -100) mob.isDead = true;
                 });
             }
@@ -2081,7 +4147,20 @@
         function updateDebugInfo() {
             if (!debugVisible) return;
             const x = yawObject.position.x.toFixed(1); const y = yawObject.position.y.toFixed(1); const z = yawObject.position.z.toFixed(1);
-            let biome = "Void"; if (currentDim === 'overworld') { if (yawObject.position.x > 20) biome = "Desert"; else biome = "Forest/Plains"; } else if (currentDim === 'the_end') { biome = "The End"; }
+            let biome = "Void"; 
+            if (currentDim === 'overworld') { 
+                const wx = yawObject.position.x;
+                // Boundaries based on generation offsets * BLOCK_SIZE (5)
+                if (wx > 100) biome = "Desert"; 
+                else if (wx < -100) biome = "Ice Spikes";
+                else biome = "Forest/Plains"; 
+            } 
+            else if (currentDim === 'the_end') { 
+                biome = "The End"; 
+            }
+            else if (currentDim === 'the_nether') {
+                biome = "Nether";
+            }
             
             raycaster.setFromCamera(center, camera); 
             const world = getActiveWorld(); 
@@ -2135,11 +4214,11 @@ Players: ${isConnected ? Array.from(networkEntities.values()).filter(m=>m.type==
         }
 
         function updateDayNightCycle(delta) {
-            if (currentDim === 'the_end') {
-                scene.background = new THREE.Color(0x050505);
-                if (scene.fog) scene.fog.color = new THREE.Color(0x050505); // Guard check
-                ambientLight.intensity = 0.6;
-                // Hide celestials in end
+            if (currentDim === 'the_end' || currentDim === 'the_nether') {
+                const color = currentDim === 'the_end' ? 0x050505 : 0x300000;
+                scene.background = new THREE.Color(color);
+                if (scene.fog) scene.fog.color = new THREE.Color(color); 
+                ambientLight.intensity = 0.8;
                 if (celestialManager) celestialManager.update(worldTimeRatio, yawObject.position, currentDim);
                 return;
             }
@@ -2191,24 +4270,41 @@ Players: ${isConnected ? Array.from(networkEntities.values()).filter(m=>m.type==
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now(); const delta = (time - prevTime) / 1000;
+
+            // --- WATER ANIMATION ---
+            if (materials.water.map) {
+                materials.water.map.offset.y += delta * 0.2; // Flow animation
+                materials.water.map.offset.x += delta * 0.1;
+            }
             
             updateDayNightCycle(delta);
+
+            if (!isConnected) {
+                updateFluids(delta);
+                updateSpawners(delta);
+            }
 
             if (controls.isLocked) {
                 updatePhysics(delta); 
                 raycaster.setFromCamera(center, camera);
                 const intersects = raycaster.intersectObjects(getActiveWorld().objects);
+                const maxReach = gameMode === 'survival' ? 5 : 50;
                 
                 // BLOCK HIGHLIGHTING
                 if (intersects.length > 0) { 
-                    highlightMesh.visible = true; 
-                    highlightMesh.position.copy(intersects[0].object.position);
+                    // --- NEW: BLOCK REACH CHECK ---
+                    if (intersects[0].distance <= maxReach * BLOCK_SIZE) {
+                        highlightMesh.visible = true; 
+                        highlightMesh.position.copy(intersects[0].object.position);
+                    } else {
+                        highlightMesh.visible = false;
+                    }
                     
                     // SURVIVAL MINING LOGIC (HOLD TO BREAK)
                     if (gameMode === 'survival' && isMouseDown) {
                          const targetObj = intersects[0].object;
                          // Check Unbreakable
-                         if (UNBREAKABLE_BLOCKS.includes(targetObj.userData.type)) {
+                         if (UNBREAKABLE_BLOCKS.includes(targetObj.userData.type) || intersects[0].distance > maxReach * BLOCK_SIZE) {
                              miningProgress = 0;
                              lastTargetBlockUuid = null;
                              crackingMesh.visible = false;
