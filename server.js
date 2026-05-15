@@ -88,7 +88,8 @@ function generateOverworld() {
             }
 
             if (Math.random() < 0.02) {
-                const type = Math.random() > 0.6 ? 'zombie' : 'villager';
+                const roll = Math.random();
+                const type = roll > 0.75 ? 'diddy' : (roll > 0.45 ? 'zombie' : 'villager');
                 spawnMob(type, xp, (yHeight + 2) * BLOCK_SIZE, zp, 'overworld');
             }
         }
@@ -701,9 +702,39 @@ function addBlock(x, y, z, type, dim, state = {}) {
     worldBlocks.set(getKey(x,y,z,dim), { type, state });
 }
 
+function trySummonDiddyGolemServer(x, y, z, dim) {
+    const topKey = getKey(x, y, z, dim);
+    const midKey = getKey(x, y - BLOCK_SIZE, z, dim);
+    const baseKey = getKey(x, y - 2 * BLOCK_SIZE, z, dim);
+
+    const top = worldBlocks.get(topKey);
+    const mid = worldBlocks.get(midKey);
+    const base = worldBlocks.get(baseKey);
+
+    if (!top || top.type !== 'obsidian') return false;
+    if (!mid || mid.type !== 'dirt') return false;
+    if (!base || base.type !== 'dirt') return false;
+
+    worldBlocks.delete(topKey);
+    worldBlocks.delete(midKey);
+    worldBlocks.delete(baseKey);
+
+    broadcast({ type:'block_update', x, y, z, blockType:'air', dim });
+    broadcast({ type:'block_update', x, y: y - BLOCK_SIZE, z, blockType:'air', dim });
+    broadcast({ type:'block_update', x, y: y - 2 * BLOCK_SIZE, z, blockType:'air', dim });
+
+    const mob = spawnMob('diddy', x, y + BLOCK_SIZE, z, dim);
+    mob.health = 20;
+    mob.naturalSpawn = false;
+    mob.isGolem = true;
+
+    return true;
+}
+
 function spawnMob(type, x, y, z, dim) {
     let health = 3;
     if (type === 'villager') health = 5;
+    if (type === 'diddy') health = 4;
     if (type === 'end_crystal') health = 1;
     if (type === 'blaze') health = 20;
     if (type === 'pigman') health = 20;
@@ -900,7 +931,8 @@ function attemptNaturalMobSpawning() {
         }
 
         if (spawnY > -900) {
-            const newMob = spawnMob('zombie', checkX, spawnY, checkZ, 'overworld');
+            const spawnType = Math.random() < 0.2 ? 'diddy' : 'zombie';
+            const newMob = spawnMob(spawnType, checkX, spawnY, checkZ, 'overworld');
             // Tag this mob as a natural night spawn
             newMob.naturalSpawn = true;
         }
@@ -1272,7 +1304,7 @@ function updateMobs(delta) {
         // --- ZOMBIE SUNLIGHT BURNING ---
         // Day is roughly 0.0 to 0.4 and 0.9 to 1.0. Night is 0.45 to 0.9.
         const isDay = timeRatio < 0.45 || timeRatio > 0.95;
-        if (isDay && mob.type === 'zombie' && mob.naturalSpawn && mob.dim === 'overworld') {
+        if (isDay && (mob.type === 'zombie' || mob.type === 'diddy') && mob.naturalSpawn && mob.dim === 'overworld') {
             // Check if under open sky
             if (isExposedToSun(mob.x, mob.y, mob.z, mob.dim)) {
                 const now = performance.now();
@@ -1335,7 +1367,7 @@ function updateMobs(delta) {
             }
         }
 
-        if (mob.type === 'zombie') {
+        if (mob.type === 'zombie' || mob.type === 'diddy') {
             // 1. PANIC CHECK: Am I stuck inside a house?
             // If the zombie is under a roof, forced glitch-out (Reverse velocity violently)
             if (Math.random() < 0.1 && isLocationIndoors(mob.x, mob.y, mob.z, mob.dim)) {
@@ -1380,6 +1412,7 @@ function updateMobs(delta) {
                 // Damage calculation
                 let dmg = 1;
                 if (mob.type === 'pigman') dmg = 3; // Gold sword deals more damage
+                if (mob.type === 'diddy') dmg = 2; // Oiling attack hits harder
 
                 victim.health -= dmg;
                 mob.lastAttackTime = now;
@@ -1403,8 +1436,7 @@ function updateMobs(delta) {
         }
 
         // Apply Movement & Avoidance (Zombie & Pigman)
-        const isKnockedBack = Math.abs(mob.vx) > 50 || Math.abs(mob.vz) > 50;
-        if (target && (mob.type === 'zombie' || mob.type === 'pigman') && !isKnockedBack) {
+        if (target && (mob.type === 'zombie' || mob.type === 'pigman' || mob.type === 'diddy')) {
             mob.lookAt = {x: target.x, y: mob.y, z: target.z};
             const dx = target.x - mob.x;
             const dz = target.z - mob.z;
@@ -1426,7 +1458,7 @@ function updateMobs(delta) {
                      if(mob.vy === 0) mob.vy = 25;
                 }
             }
-        } else if (mob.type === 'zombie' || mob.type === 'pigman') {
+        } else if (mob.type === 'zombie' || mob.type === 'pigman' || mob.type === 'diddy') {
             // Friction
             if (isKnockedBack) {
                 mob.vx -= mob.vx * 2.0 * delta;
@@ -1701,6 +1733,21 @@ wss.on('connection', ws => {
                 if(p) { p.x=d.x; p.y=d.y; p.z=d.z; p.yaw=d.yaw; p.dim=d.dim; } 
             }
 
+            if (d.type === 'set_gamemode') {
+                if (d.mode !== 'survival') return;
+                p.mode = 'survival';
+                p.health = Math.max(1, p.health || 20);
+                ws.send(JSON.stringify({ type: 'gamemode', mode: 'survival', isHost: (id === hostId) }));
+                ws.send(JSON.stringify({ type: 'damage', health: p.health }));
+            }
+
+            if (d.type === 'chat') {
+                if (!p || !p.username) return;
+                const message = (d.message || '').toString().trim().slice(0, 140);
+                if (!message) return;
+                broadcast({ type: 'chat', username: p.username, message });
+            }
+
             if(d.type === 'block_place') {
                 if (p.mode === 'survival') {
                     if (p.inventory[d.blockType] && p.inventory[d.blockType] > 0) {
@@ -1713,6 +1760,10 @@ wss.on('connection', ws => {
 
                 addBlock(d.x, d.y, d.z, d.blockType, d.dim, d.state || {});
                 broadcast({ type:'block_update', x:d.x, y:d.y, z:d.z, blockType:d.blockType, dim:d.dim, state: d.state || {} });
+
+                if (d.blockType === 'obsidian') {
+                    trySummonDiddyGolemServer(d.x, d.y, d.z, d.dim);
+                }
                 
                 // Register Spawner if placed by player
                 if (d.blockType === 'spawner') {
@@ -1807,6 +1858,7 @@ wss.on('connection', ws => {
                             if (p.mode === 'survival') {
                                 if (mob.type === 'blaze') p.inventory['blaze_rod'] = (p.inventory['blaze_rod'] || 0) + 1;
                                 if (mob.type === 'pigman') p.inventory['gold_nugget'] = (p.inventory['gold_nugget'] || 0) + 1;
+                                if (mob.type === 'diddy') p.inventory['eye_of_ender'] = (p.inventory['eye_of_ender'] || 0) + 1;
                                 ws.send(JSON.stringify({ type: 'inventory_update', inventory: p.inventory }));
                             }
                         }
@@ -2160,3 +2212,5 @@ setInterval(() => {
         });
     }
 }, 50);
+
+console.log("Server running on ws://localhost:8080");

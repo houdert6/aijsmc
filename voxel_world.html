@@ -282,6 +282,102 @@
         .inv-count { font-size: 10px; position: absolute; bottom: 2px; right: 2px; }
         .inv-name { font-size: 8px; margin-top: 2px; text-align: center; width: 100%; overflow: hidden; }
         .inv-helper { font-size: 0.8em; color: #aaa; font-style: italic; }
+
+        #chat-container {
+            position: absolute;
+            left: 10px;
+            bottom: 70px;
+            width: 320px;
+            z-index: 80;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            pointer-events: none;
+        }
+        #chat-log {
+            max-height: 160px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+        .chat-line {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-shadow: 1px 1px 0 #000;
+        }
+        #chat-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            border: 1px solid #888;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-family: inherit;
+            display: none;
+            pointer-events: auto;
+        }
+
+        #spotify-panel {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            width: 340px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #1db954;
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 85;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #spotify-panel h3 {
+            margin: 0 0 8px 0;
+            color: #1db954;
+            font-size: 14px;
+        }
+        #spotify-url {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px;
+            margin-bottom: 6px;
+            background: #111;
+            border: 1px solid #1db954;
+            color: white;
+            font-family: inherit;
+        }
+        #spotify-actions {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .spotify-btn {
+            flex: 1;
+            padding: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+        }
+        #spotify-load { background: #1db954; color: black; }
+        #spotify-close { background: #444; color: white; }
+        #spotify-status {
+            min-height: 16px;
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 6px;
+        }
+        #spotify-frame {
+            width: 100%;
+            height: 352px;
+            border: none;
+            border-radius: 6px;
+            background: #000;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -293,7 +389,7 @@
         <b>Voxel World</b><br>
         WASD to Move | SPACE to Jump/Fly | Shift to Sneak<br>
         L-Click: Break/Attack | R-Click: Place/Toggle Door<br>
-        1-9: Select Item | <b>F3: Debug Info</b><br>
+        1-9: Select Item | <b>F3: Debug Info</b> | <b>T: Chat</b> | <b>P: Spotify</b><br>
         <span style="color: #0ff;">Find the Network Block in The End!</span>
     </div>
 
@@ -353,6 +449,22 @@
         <div class="slot" id="slot9"><span class="slot-qty"></span></div>
         <!-- NEW 10th SLOT (Hidden by default) -->
         <div class="slot" id="slot10" style="display: none; border-color: #ff0000;"><span class="slot-qty"></span></div>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat-log"></div>
+        <input type="text" id="chat-input" maxlength="140" placeholder="Type message and press Enter...">
+    </div>
+
+    <div id="spotify-panel">
+        <h3>Spotify</h3>
+        <input id="spotify-url" type="text" placeholder="Type song name or paste Spotify link">
+        <div id="spotify-actions">
+            <button id="spotify-load" class="spotify-btn">LOAD</button>
+            <button id="spotify-close" class="spotify-btn">CLOSE</button>
+        </div>
+        <div id="spotify-status"></div>
+        <iframe id="spotify-frame" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
     </div>
 
     <script>
@@ -875,6 +987,8 @@
         let mpUsername = "Player";
         let isConnected = false;
         let lastPortalSoundTime = 0;
+        let isChatOpen = false;
+        const chatHistory = [];
 
         // --- DAY NIGHT CYCLE VARS ---
         let worldTimeRatio = 0; // 0.0 to 1.0 (0 = start of day, 0.5 = night start)
@@ -882,6 +996,196 @@
         let singlePlayerTime = 0;
 
         const villagePOIs = []; // Store client-side POIs
+
+        const chatLogEl = document.getElementById('chat-log');
+        const chatInputEl = document.getElementById('chat-input');
+        const spotifyPanelEl = document.getElementById('spotify-panel');
+        const spotifyUrlEl = document.getElementById('spotify-url');
+        const spotifyFrameEl = document.getElementById('spotify-frame');
+        const spotifyStatusEl = document.getElementById('spotify-status');
+        const spotifyLoadBtnEl = document.getElementById('spotify-load');
+        const spotifyCloseBtnEl = document.getElementById('spotify-close');
+        let spotifyAnonToken = null;
+        let spotifyAnonTokenExpiresAt = 0;
+
+        function renderChatLog(showAll = false) {
+            chatLogEl.innerHTML = '';
+            const maxLines = showAll ? 30 : 8;
+            const start = Math.max(0, chatHistory.length - maxLines);
+            for (let i = start; i < chatHistory.length; i++) {
+                const entry = chatHistory[i];
+                const line = document.createElement('div');
+                line.className = 'chat-line';
+                line.textContent = `<${entry.username}> ${entry.message}`;
+                chatLogEl.appendChild(line);
+            }
+            chatLogEl.style.maxHeight = showAll ? '260px' : '160px';
+            chatLogEl.style.overflowY = showAll ? 'auto' : 'hidden';
+            if (showAll) chatLogEl.scrollTop = chatLogEl.scrollHeight;
+        }
+
+        function addChatMessage(username, message) {
+            chatHistory.push({ username, message });
+            while (chatHistory.length > 100) chatHistory.shift();
+            renderChatLog(isChatOpen);
+        }
+
+        function openChatInput() {
+            if (!isConnected) return;
+            isChatOpen = true;
+            if (document.pointerLockElement === document.body) document.exitPointerLock();
+            renderChatLog(true);
+            chatInputEl.style.display = 'block';
+            chatInputEl.focus();
+        }
+
+        function closeChatInput(refocusGame = true) {
+            isChatOpen = false;
+            chatInputEl.value = '';
+            chatInputEl.style.display = 'none';
+            renderChatLog(false);
+            if (refocusGame && controls.isLocked === false && document.getElementById('trade-menu').style.display !== 'block' && document.getElementById('inventory-menu').style.display !== 'block') {
+                document.body.requestPointerLock();
+            }
+        }
+
+        function sendChatMessage() {
+            if (!isConnected || !ws) return;
+            const text = chatInputEl.value.trim();
+            if (!text) { closeChatInput(true); return; }
+            ws.send(JSON.stringify({ type: 'chat', message: text }));
+            closeChatInput(true);
+        }
+
+        function parseSpotifyInput(raw) {
+            const value = (raw || '').trim();
+            if (!value) return { embedUrl: '', query: '' };
+
+            if (value.includes('open.spotify.com/embed/')) {
+                return { embedUrl: value, query: '' };
+            }
+
+            if (value.startsWith('spotify:')) {
+                const parts = value.split(':');
+                if (parts.length >= 3) {
+                    const type = parts[1];
+                    const id = parts[2];
+                    if (['track', 'album', 'playlist', 'episode', 'show'].includes(type)) {
+                        return { embedUrl: `https://open.spotify.com/embed/${type}/${id}`, query: '' };
+                    }
+                }
+            }
+
+            const match = value.match(/open\.spotify\.com\/(track|album|playlist|episode|show)\/([A-Za-z0-9]+)/i);
+            if (match) {
+                return { embedUrl: `https://open.spotify.com/embed/${match[1].toLowerCase()}/${match[2]}`, query: '' };
+            }
+
+            return { embedUrl: '', query: value };
+        }
+
+        async function getSpotifyAnonymousToken() {
+            const now = Date.now();
+            if (spotifyAnonToken && now < spotifyAnonTokenExpiresAt - 30_000) return spotifyAnonToken;
+
+            const response = await fetch('https://open.spotify.com/get_access_token?reason=transport&productType=web_player');
+            if (!response.ok) throw new Error('token_fetch_failed');
+            const data = await response.json();
+            if (!data || !data.accessToken) throw new Error('token_missing');
+
+            spotifyAnonToken = data.accessToken;
+            spotifyAnonTokenExpiresAt = data.accessTokenExpirationTimestampMs || (now + 60_000);
+            return spotifyAnonToken;
+        }
+
+        async function resolveSpotifyTrackEmbedFromQuery(query) {
+            const token = await getSpotifyAnonymousToken();
+            const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1&market=US`;
+            const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('search_failed');
+
+            const data = await response.json();
+            const item = data?.tracks?.items?.[0];
+            if (!item || !item.id) return '';
+            return `https://open.spotify.com/embed/track/${item.id}`;
+        }
+
+        async function resolveSpotifyTrackEmbedFromSearchPage(query) {
+            const mirrorUrl = `https://r.jina.ai/http://open.spotify.com/search/${encodeURIComponent(query)}`;
+            const response = await fetch(mirrorUrl);
+            if (!response.ok) throw new Error('mirror_fetch_failed');
+            const text = await response.text();
+            const match = text.match(/open\.spotify\.com\/track\/([A-Za-z0-9]{22})/i);
+            if (!match) return '';
+            return `https://open.spotify.com/embed/track/${match[1]}`;
+        }
+
+        async function loadSpotifyLink() {
+            const parsed = parseSpotifyInput(spotifyUrlEl.value);
+            if (!parsed.embedUrl && !parsed.query) {
+                spotifyStatusEl.textContent = 'Type a song name or paste a Spotify link.';
+                return;
+            }
+
+            if (parsed.embedUrl) {
+                spotifyFrameEl.src = parsed.embedUrl;
+                spotifyStatusEl.textContent = 'Loaded.';
+                return;
+            }
+
+            spotifyStatusEl.textContent = 'Searching…';
+            try {
+                let embedUrl = '';
+                try {
+                    embedUrl = await resolveSpotifyTrackEmbedFromQuery(parsed.query);
+                } catch {
+                    embedUrl = '';
+                }
+
+                if (!embedUrl) {
+                    embedUrl = await resolveSpotifyTrackEmbedFromSearchPage(parsed.query);
+                }
+
+                if (!embedUrl) {
+                    spotifyStatusEl.textContent = 'No Spotify track found for that search.';
+                    return;
+                }
+
+                spotifyFrameEl.src = embedUrl;
+                spotifyStatusEl.textContent = 'Loaded from search.';
+            } catch {
+                spotifyStatusEl.textContent = 'Search failed. Try "song - artist" or paste a Spotify track link.';
+            }
+        }
+
+        function openSpotifyPanel() {
+            spotifyPanelEl.style.display = 'block';
+            if (document.pointerLockElement === document.body) document.exitPointerLock();
+            spotifyUrlEl.focus();
+        }
+
+        function closeSpotifyPanel(refocusGame = true) {
+            spotifyPanelEl.style.display = 'none';
+            if (refocusGame && controls.isLocked === false && document.getElementById('trade-menu').style.display !== 'block' && document.getElementById('inventory-menu').style.display !== 'block' && !isChatOpen) {
+                document.body.requestPointerLock();
+            }
+        }
+
+        function toggleSpotifyPanel() {
+            if (spotifyPanelEl.style.display === 'block') closeSpotifyPanel(true);
+            else openSpotifyPanel();
+        }
+
+        spotifyLoadBtnEl.addEventListener('click', loadSpotifyLink);
+        spotifyCloseBtnEl.addEventListener('click', () => closeSpotifyPanel(true));
+        spotifyUrlEl.addEventListener('keydown', (event) => {
+            if (event.code === 'Enter') {
+                event.preventDefault();
+                loadSpotifyLink();
+            }
+        });
 
         // --- NEW STATE VARIABLES ---
         let isHost = false;
@@ -1269,6 +1573,8 @@
             hover: new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, opacity: 0.5, transparent: true }),
             zombieSkin: new THREE.MeshLambertMaterial({ color: 0x2E8B57 }),
             zombieClothes: new THREE.MeshLambertMaterial({ color: 0x00008B }),
+            diddySkin: new THREE.MeshLambertMaterial({ color: 0x8d5524 }),
+            diddyClothes: new THREE.MeshLambertMaterial({ color: 0x6a0dad }),
             villagerSkin: new THREE.MeshLambertMaterial({ color: 0xD2B48C }),
             villagerClothes: new THREE.MeshLambertMaterial({ color: 0x8B4513 }),
             network_block: new THREE.MeshLambertMaterial({ map: createBlockTexture('#00ffff', 'network'), emissive: 0x004444, emissiveIntensity: 0.5 }),
@@ -1474,6 +1780,39 @@
             world.data.delete(getCoordsKey(mesh.position.x, mesh.position.y, mesh.position.z));
         }
 
+        function trySummonDiddyGolemAt(x, y, z, dim) {
+            const world = dimensions[dim];
+            if (!world) return false;
+
+            const topKey = getCoordsKey(x, y, z);
+            const midKey = getCoordsKey(x, y - BLOCK_SIZE, z);
+            const baseKey = getCoordsKey(x, y - 2 * BLOCK_SIZE, z);
+
+            const top = world.data.get(topKey);
+            const mid = world.data.get(midKey);
+            const base = world.data.get(baseKey);
+
+            if (!top || top.userData.type !== 'obsidian') return false;
+            if (!mid || mid.userData.type !== 'dirt') return false;
+            if (!base || base.userData.type !== 'dirt') return false;
+
+            removeBlock(top);
+            removeBlock(mid);
+            removeBlock(base);
+
+            const grp = spawnMob(x, y + BLOCK_SIZE, z, 'diddy', dim, 'clientMob');
+            grp.userData.isGolem = true;
+            grp.userData.naturalSpawn = false;
+
+            const mob = mobs.find(m => m.mesh === grp);
+            if (mob) {
+                mob.health = 20;
+                grp.userData.health = 20;
+            }
+
+            return true;
+        }
+
         function placeBlockInteraction(x, y, z, type, state = {}) {
             if (gameMode === 'survival') {
                 if (!inventory[type] || inventory[type] <= 0) return; // Client-side prediction
@@ -1490,6 +1829,9 @@
                 }));
             } else {
                 addBlock(x, y, z, type, null, state);
+                if (type === 'obsidian') {
+                    trySummonDiddyGolemAt(x, y, z, currentDim);
+                }
                 if (type === 'water') scheduleFluidUpdate(x, y, z, currentDim);
                 wakeNeighbors(x, y, z, currentDim);
             }
@@ -1568,7 +1910,8 @@
                         if (Math.random() > 0.96) createTree(xp, (yHeight + 1) * BLOCK_SIZE, zp, 'overworld');
                     }
                     if (Math.random() < 0.02) {
-                        const type = Math.random() > 0.6 ? 'zombie' : 'villager';
+                        const roll = Math.random();
+                        const type = roll > 0.75 ? 'diddy' : (roll > 0.45 ? 'zombie' : 'villager');
                         spawnMob(xp, (yHeight + 2) * BLOCK_SIZE, zp, type, 'overworld', 'clientMob');
                     }
                 }
@@ -2117,7 +2460,7 @@
             group.position.set(x, y, z);
             group.userData.isMob = true;
             group.userData.type = type;
-            group.userData.health = type === 'villager' ? 5 : 3;
+            group.userData.health = type === 'villager' ? 5 : (type === 'diddy' ? 4 : 3);
 
             if (type === 'end_crystal') {
                 // Base
@@ -2160,7 +2503,9 @@
                 const bodyW = 3, bodyH = 6, bodyD = 2; const headSize = 2.5;
                 let skinMat, clothMat;
                 if (type === 'player') { skinMat = new THREE.MeshLambertMaterial({ color: 0xffccaa }); clothMat = new THREE.MeshLambertMaterial({ color: 0xcc0000 }); } 
-                else { skinMat = type === 'zombie' ? materials.zombieSkin : materials.villagerSkin; clothMat = type === 'zombie' ? materials.zombieClothes : materials.villagerClothes; }
+                else if (type === 'zombie') { skinMat = materials.zombieSkin; clothMat = materials.zombieClothes; }
+                else if (type === 'diddy') { skinMat = materials.diddySkin; clothMat = materials.diddyClothes; }
+                else { skinMat = materials.villagerSkin; clothMat = materials.villagerClothes; }
 
                 const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), clothMat); body.position.y = bodyH / 2; group.add(body);
                 const head = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skinMat); head.position.y = bodyH + (headSize / 2); group.add(head);
@@ -2168,7 +2513,7 @@
                 const armL = new THREE.Mesh(armGeo, skinMat); armL.position.set(-2, 3, 0); 
                 const armR = new THREE.Mesh(armGeo, skinMat); armR.position.set(2, 3, 0); 
                 
-                if (type === 'zombie' || type === 'pigman') { 
+                if (type === 'zombie' || type === 'pigman' || type === 'diddy') { 
                     armL.rotation.x = -Math.PI / 2; armL.position.set(-2, 5, 2); 
                     armR.rotation.x = -Math.PI / 2; armR.position.set(2, 5, 2); 
                 }
@@ -2465,7 +2810,61 @@
         let lastSpaceTime = 0;
         let lastAmbienceTime = 0;
         document.addEventListener('keydown', (event) => {
-            //if (event.code == 'F4') { switchDimension('the_end') }
+            const spotifyPanelOpen = spotifyPanelEl.style.display === 'block';
+            const typingInSpotify = spotifyPanelOpen && document.activeElement === spotifyUrlEl;
+
+            if (typingInSpotify) {
+                if (event.code === 'Escape') {
+                    event.preventDefault();
+                    closeSpotifyPanel(true);
+                }
+                return;
+            }
+
+            if (event.code === 'KeyP') {
+                if (event.repeat) return;
+                event.preventDefault();
+                toggleSpotifyPanel();
+                return;
+            }
+
+            if (event.code === 'KeyT') {
+                if (event.repeat) return;
+                event.preventDefault();
+                if (!isConnected || isChatOpen) return;
+                openChatInput();
+                return;
+            }
+
+            if (event.code === 'Enter') {
+                if (event.repeat) return;
+                event.preventDefault();
+                if (!isConnected || !isChatOpen) return;
+                sendChatMessage();
+                return;
+            }
+
+            if (event.code === 'Escape' && isChatOpen) {
+                event.preventDefault();
+                closeChatInput(false);
+                return;
+            }
+
+            if (isChatOpen) return;
+
+            if (event.code === 'F4') {
+                event.preventDefault();
+                if (isConnected) {
+                    ws.send(JSON.stringify({ type: 'set_gamemode', mode: 'survival' }));
+                } else {
+                    gameMode = 'survival';
+                    isFlying = false;
+                    if (myHealth <= 0) myHealth = 20;
+                    updateHealthUI();
+                    updateInventoryUI();
+                }
+                return;
+            }
             if (event.code === 'F3') {
                 event.preventDefault(); debugVisible = !debugVisible;
                 document.getElementById('debug-menu').style.display = debugVisible ? 'block' : 'none'; return;
@@ -3251,6 +3650,9 @@
                     statusEl.innerText = "Status: Disconnected"; statusEl.style.color = "#aaa";
                     isConnected = false;
                     isHost = false;
+                    closeChatInput(false);
+                    chatHistory.length = 0;
+                    renderChatLog(false);
                     networkEntities.forEach(obj => { obj.mesh.parent.remove(obj.mesh); });
                     networkEntities.clear();
                     gameMode = 'creative'; 
@@ -3484,6 +3886,9 @@
             else if (data.type === 'trade_fail') {
                 soundManager.playDamage(); // Error sound
             }
+            else if (data.type === 'chat') {
+                addChatMessage(data.username || 'Player', data.message || '');
+            }
             else if (data.type === 'knockback') {
                 velocity.x = data.vx;
                 velocity.y = data.vy;
@@ -3575,6 +3980,10 @@
                                 inventory['gold_nugget'] = (inventory['gold_nugget'] || 0) + 1;
                                 updateInventoryUI();
                             }
+                        }
+                    if (mob.type === 'diddy' && gameMode === 'survival') {
+                            inventory['eye_of_ender'] = (inventory['eye_of_ender'] || 0) + 1;
+                            updateInventoryUI();
                         }
                     if (currentBlockType === 'hammer') {
                             const camDir = new THREE.Vector3();
@@ -3832,7 +4241,8 @@
                 }
 
                 if (spawnY > -900) {
-                    const grp = spawnMob(checkX, spawnY, checkZ, 'zombie', 'overworld', 'clientMob');
+                    const spawnType = Math.random() < 0.2 ? 'diddy' : 'zombie';
+                    const grp = spawnMob(checkX, spawnY, checkZ, spawnType, 'overworld', 'clientMob');
                     // Tag natural spawn for burning logic
                     grp.userData.naturalSpawn = true;
                 }
@@ -4312,7 +4722,7 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                     const type = entity.mesh.userData.type; // Get type from mesh
                     
                     if (dist < 20) { 
-                        if (type === 'zombie') soundManager.playZombie(dist); 
+                        if (type === 'zombie' || type === 'diddy') soundManager.playZombie(dist); 
                         if (type === 'villager') soundManager.playVillager(dist); 
                     }
                     entity.lastGruntTime = currentTime;
@@ -4427,7 +4837,7 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                     // --- ZOMBIE SUNLIGHT BURNING (SINGLEPLAYER) ---
                     const isDay = worldTimeRatio < 0.45 || worldTimeRatio > 0.95;
                     // Check tag 'userData.naturalSpawn'
-                    if (isDay && mob.type === 'zombie' && mob.mesh.userData.naturalSpawn && mob.dim === 'overworld') {
+                    if (isDay && (mob.type === 'zombie' || mob.type === 'diddy') && mob.mesh.userData.naturalSpawn && mob.dim === 'overworld') {
                         if (isExposedToSun(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, mob.dim)) {
                             if (currentTime - mob.lastDamageTime > 500) {
                                 mob.health--;
@@ -4447,7 +4857,7 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                     if (currentTime - mob.lastGruntTime > 2000 + Math.random() * 5000) {
                         const dist = mob.mesh.position.distanceTo(yawObject.position);
                         if (dist < 20) { 
-                            if (mob.type === 'zombie') soundManager.playZombie(dist); 
+                            if (mob.type === 'zombie' || mob.type === 'diddy') soundManager.playZombie(dist); 
                             if (mob.type === 'villager') soundManager.playVillager(dist);
                             if (mob.type === 'blaze') soundManager.playBlaze(dist);
                             if (mob.type === 'pigman') soundManager.playPigman(dist);
@@ -4458,7 +4868,7 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                     
                     // --- TARGET SELECTION ---
                     let target = null; let minDist = 100; 
-                    if (mob.type === 'zombie') {
+                    if (mob.type === 'zombie' || mob.type === 'diddy') {
                 
                     // 1. SELF CHECK: Am I glitching inside a house?
                     if (Math.random() < 0.1 && isLocationIndoors(mob.mesh.position.x, mob.mesh.position.y, mob.mesh.position.z, currentDim)) {
@@ -4500,7 +4910,14 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                         if (minDist < 3 && target) {
                             if (target === yawObject.position) {
                                 if (currentTime - mob.lastAttackTime > 1000) {
-                                    myHealth--;
+                                    const diddyOiling = mob.type === 'diddy';
+                                    myHealth -= diddyOiling ? 2 : 1;
+                                    if (diddyOiling) {
+                                        const pushDir = new THREE.Vector3().subVectors(yawObject.position, mob.mesh.position).normalize();
+                                        velocity.x += pushDir.x * 80;
+                                        velocity.z += pushDir.z * 80;
+                                        particleSystem.spawnFlame(yawObject.position.x, yawObject.position.y - 8, yawObject.position.z, currentDim);
+                                    }
                                     soundManager.playDamage();
                                     updateHealthUI();
                                     mob.lastAttackTime = currentTime;
@@ -4535,11 +4952,11 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                         }
                     }
 
-                    const speed = mob.type === 'zombie' ? 15 : 20; 
+                    const speed = (mob.type === 'zombie' || mob.type === 'diddy') ? 15 : 20; 
                     const moveDir = new THREE.Vector3(0, 0, 0);
                     // Zombie/Flee AI
                     if (target && mob.type !== 'villager') { 
-                        if (mob.type === 'zombie') { moveDir.subVectors(target, mob.mesh.position).normalize(); } 
+                        if (mob.type === 'zombie' || mob.type === 'diddy') { moveDir.subVectors(target, mob.mesh.position).normalize(); } 
                         
                         // Blaze & Pigman Look Logic
                         if ((mob.type === 'blaze' || mob.type === 'pigman') && target) {
@@ -4549,7 +4966,7 @@ Make sure the SEARCH block matches the original code exactly. Do not wrap the ou
                         const lookAheadDist = 4; const checkPos = mob.mesh.position.clone().add(moveDir.clone().multiplyScalar(lookAheadDist)).add(new THREE.Vector3(0, 5, 0));
                         const cliffRay = new THREE.Raycaster(checkPos, new THREE.Vector3(0, -1, 0), 0, 15); const groundHits = cliffRay.intersectObjects(getActiveWorld().objects);
                         if (groundHits.length > 0) {
-                            if (mob.type === 'zombie' || mob.type === 'pigman') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z); 
+                            if (mob.type === 'zombie' || mob.type === 'pigman' || mob.type === 'diddy') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z); 
                             
                             // Only apply walking velocity if NOT a blaze (Blaze hovers separately)
                             const isKnockedBack = Math.abs(mob.velocity.x) > 50 || Math.abs(mob.velocity.z) > 50;
