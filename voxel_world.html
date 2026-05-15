@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voxel World - JS Minecraft Clone</title>
+    <title>Voxel World - F3 Debug Update</title>
     <style>
         body {
             margin: 0;
@@ -42,6 +42,35 @@
             padding: 10px;
             border-radius: 4px;
             pointer-events: none;
+        }
+        #debug-menu {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            font-family: monospace;
+            font-size: 14px;
+            color: white;
+            text-shadow: 1px 1px 0 #000;
+            padding: 10px;
+            box-sizing: border-box;
+            z-index: 100;
+            line-height: 1.4;
+            background: rgba(0, 0, 0, 0.2); /* Slight tint for readability */
+        }
+        .debug-left {
+            float: left;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+        }
+        .debug-right {
+            float: right;
+            text-align: right;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
         }
         #instructions {
             position: absolute;
@@ -88,6 +117,7 @@
         /* Special Styles for Item Icons */
         #slot6::after { content: ''; width: 20px; height: 20px; background: radial-gradient(circle, black 30%, #e0d5a6 40%); border: 2px solid #555; }
         #slot7::after { content: ''; width: 20px; height: 20px; background: #3c8; border-radius: 50%; border: 2px solid #153; }
+        #slot9::after { content: ''; width: 4px; height: 30px; background: #3a5a2a; box-shadow: 6px 0 #3a5a2a, -6px 0 #3a5a2a; } 
     </style>
     <!-- Import Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -100,8 +130,13 @@
         <b>Voxel World</b><br>
         WASD to Move | SPACE to Jump/Fly<br>
         L-Click: Break | R-Click: Place/Use<br>
-        1-7: Select Item<br>
-        <span style="color: #aaa; font-size: 0.8em;">Build a 3x3 portal frame & fill with eyes!</span>
+        1-9: Select Item | <b>F3: Debug Info</b><br>
+        <span style="color: #ffd700; font-size: 0.9em;">Look for the Desert Island!</span>
+    </div>
+
+    <div id="debug-menu">
+        <div class="debug-left" id="debug-left"></div>
+        <div class="debug-right" id="debug-right"></div>
     </div>
 
     <div id="instructions">
@@ -117,12 +152,14 @@
         <div class="slot" id="slot5" style="background-color: #2e7d32;"></div>
         <div class="slot" id="slot6" style="background-color: #e0d5a6;"></div> <!-- Frame -->
         <div class="slot" id="slot7" style="background-color: transparent;"></div> <!-- Eye -->
+        <div class="slot" id="slot8" style="background-color: #e6ddc5;"></div> <!-- Sand -->
+        <div class="slot" id="slot9" style="background-color: #6a8a4a;"></div> <!-- Cactus -->
     </div>
 
     <script>
         // --- GAME CONFIGURATION ---
-        const WORLD_SIZE = 20; // Size of the chunk (20x20 blocks)
-        const BLOCK_SIZE = 5;  // Visual size of blocks
+        const WORLD_SIZE = 20; 
+        const BLOCK_SIZE = 5;  
         
         // --- ASSETS (Procedural Textures) ---
         function createBlockTexture(color, type = 'standard', noiseFactor = 0.1) {
@@ -131,11 +168,9 @@
             canvas.height = 64;
             const ctx = canvas.getContext('2d');
             
-            // Base color
             ctx.fillStyle = color;
             ctx.fillRect(0, 0, 64, 64);
             
-            // Add noise
             for (let i = 0; i < 400; i++) {
                 const x = Math.random() * 64;
                 const y = Math.random() * 64;
@@ -147,43 +182,35 @@
                 ctx.fillRect(x, y, size, size);
             }
 
-            // Specific Texture Logic
             if (type === 'frame' || type === 'frame_filled') {
-                // Draw Frame Inner Circle
                 ctx.fillStyle = '#222';
                 ctx.beginPath();
                 ctx.arc(32, 32, 15, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Draw Decoration
                 ctx.strokeStyle = '#555';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(10, 10, 44, 44);
-
                 if (type === 'frame_filled') {
-                    // Eye of Ender
-                    ctx.fillStyle = '#3c8'; // Greenish
+                    ctx.fillStyle = '#3c8'; 
                     ctx.beginPath();
                     ctx.arc(32, 32, 8, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.fillStyle = '#000'; // Pupil
+                    ctx.fillStyle = '#000'; 
                     ctx.fillRect(30, 20, 4, 24);
                 }
-            } else if (type === 'end_stone') {
-                // Inverted noise effect mostly
-                ctx.fillStyle = 'rgba(200, 200, 150, 0.2)';
-                for(let k=0; k<50; k++) {
-                     ctx.fillRect(Math.random()*64, Math.random()*64, 10, 10);
-                }
+            } else if (type === 'cactus') {
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                for(let x=8; x<64; x+=16) ctx.fillRect(x, 0, 4, 64);
+                ctx.fillStyle = '#333';
+                for(let i=0; i<20; i++) ctx.fillRect(Math.random()*60, Math.random()*60, 2, 2);
             }
 
-            // Add border/bevel effect
             ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 4;
             ctx.strokeRect(0,0,64,64);
 
             const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter; // Pixelated look
+            texture.magFilter = THREE.NearestFilter; 
             return texture;
         }
 
@@ -193,13 +220,13 @@
             stone: new THREE.MeshLambertMaterial({ map: createBlockTexture('#808080') }),
             wood: new THREE.MeshLambertMaterial({ map: createBlockTexture('#4e342e') }),
             leaves: new THREE.MeshLambertMaterial({ map: createBlockTexture('#2e7d32', 0.2), transparent: true, opacity: 0.9 }),
-            // End Materials
+            sand: new THREE.MeshLambertMaterial({ map: createBlockTexture('#e6ddc5', 'standard', 0.05) }),
+            cactus: new THREE.MeshLambertMaterial({ map: createBlockTexture('#6a8a4a', 'cactus') }),
             end_frame: new THREE.MeshLambertMaterial({ map: createBlockTexture('#e0d5a6', 'frame') }),
             end_frame_filled: new THREE.MeshLambertMaterial({ map: createBlockTexture('#e0d5a6', 'frame_filled') }),
             end_stone: new THREE.MeshLambertMaterial({ map: createBlockTexture('#fcf8d2', 'end_stone') }),
             obsidian: new THREE.MeshLambertMaterial({ color: 0x1a1a2e }),
-            portal: new THREE.MeshBasicMaterial({ color: 0x000000 }), // Pure black for now
-            // UI/Mobs
+            portal: new THREE.MeshBasicMaterial({ color: 0x000000 }), 
             hover: new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, opacity: 0.5, transparent: true }),
             zombieSkin: new THREE.MeshLambertMaterial({ color: 0x2E8B57 }),
             zombieClothes: new THREE.MeshLambertMaterial({ color: 0x00008B }),
@@ -207,13 +234,11 @@
             villagerClothes: new THREE.MeshLambertMaterial({ color: 0x8B4513 })
         };
 
-        const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'end_frame', 'eye_of_ender'];
+        const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'end_frame', 'eye_of_ender', 'sand', 'cactus'];
         let currentBlockType = 'grass';
 
         // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
-        // Background set dynamically based on dimension
-
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -229,9 +254,9 @@
         const dimensions = {
             overworld: {
                 group: new THREE.Group(),
-                objects: [], // For collision
+                objects: [], 
                 data: new Map(),
-                generated: true, // Generated on init
+                generated: true,
                 skyColor: 0x87CEEB,
                 fog: new THREE.Fog(0x87CEEB, 20, 200)
             },
@@ -247,58 +272,35 @@
 
         let currentDim = 'overworld';
 
-        // Helper to get current active data
-        function getActiveWorld() {
-            return dimensions[currentDim];
-        }
+        function getActiveWorld() { return dimensions[currentDim]; }
 
         function switchDimension(newDim) {
             if (newDim === currentDim) return;
-
-            // Remove current group
             scene.remove(dimensions[currentDim].group);
-            
-            // Setup new dim
             currentDim = newDim;
             const world = dimensions[currentDim];
-
-            // Generate if first time
             if (!world.generated) {
                 if (newDim === 'the_end') generateEndWorld();
                 world.generated = true;
             }
-
-            // Add new group
             scene.add(world.group);
             scene.background = new THREE.Color(world.skyColor);
             scene.fog = world.fog;
-
-            // Reset Player Position safely
             yawObject.position.set(0, 50, 0);
             velocity.set(0, 0, 0);
         }
 
         const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        function getCoordsKey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
 
-        function getCoordsKey(x, y, z) {
-            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
-        }
-
-        // Modified addBlock to use active dimension
         function addBlock(x, y, z, type, specificDim = null) {
             const world = specificDim ? dimensions[specificDim] : getActiveWorld();
-            
-            // Prevent duplicates
             const key = getCoordsKey(x, y, z);
             if (world.data.has(key)) return;
-
             const material = materials[type];
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(x, y, z);
-            
-            // Tag mesh with type for logic
             mesh.userData.type = type;
-
             world.group.add(mesh);
             world.objects.push(mesh);
             world.data.set(key, mesh);
@@ -314,8 +316,6 @@
         }
 
         // --- WORLD GENERATION ---
-
-        // Simple Noise function for terrain
         function simpleNoise(x, z) {
             const sinX = Math.sin(x * 0.1);
             const cosZ = Math.cos(z * 0.1);
@@ -323,34 +323,47 @@
         }
 
         function generateOverworld() {
-            // Switch context temporarily if needed, but we assume init runs in overworld
             for (let x = -WORLD_SIZE/2; x < WORLD_SIZE/2; x++) {
                 for (let z = -WORLD_SIZE/2; z < WORLD_SIZE/2; z++) {
                     const xp = x * BLOCK_SIZE;
                     const zp = z * BLOCK_SIZE;
                     const yHeight = Math.floor(simpleNoise(x, z));
-                    
                     addBlock(xp, yHeight * BLOCK_SIZE, zp, 'grass', 'overworld');
-                    for(let d=1; d<=2; d++) {
-                        addBlock(xp, (yHeight - d) * BLOCK_SIZE, zp, 'dirt', 'overworld');
-                    }
-
+                    for(let d=1; d<=2; d++) addBlock(xp, (yHeight - d) * BLOCK_SIZE, zp, 'dirt', 'overworld');
+                    
                     if (x > -10 && x < 10 && z > -10 && z < 10) { 
-                        if (Math.random() > 0.96) {
-                            createTree(xp, (yHeight + 1) * BLOCK_SIZE, zp, 'overworld');
-                        }
+                        if (Math.random() > 0.96) createTree(xp, (yHeight + 1) * BLOCK_SIZE, zp, 'overworld');
                     }
-
                     if (Math.random() < 0.02) {
                         const type = Math.random() > 0.6 ? 'zombie' : 'villager';
                         spawnMob(xp, (yHeight + 2) * BLOCK_SIZE, zp, type, 'overworld');
                     }
                 }
             }
+            generateDesert();
+        }
+
+        function generateDesert() {
+            const offset = 35; 
+            const size = 20;
+            for (let x = 0; x < size; x++) {
+                for (let z = -size/2; z < size/2; z++) {
+                    const worldX = (x + offset) * BLOCK_SIZE;
+                    const worldZ = z * BLOCK_SIZE;
+                    const h = Math.sin(x * 0.3) * 1.5 + Math.cos(z * 0.4) * 1.5;
+                    const yHeight = Math.floor(h);
+                    addBlock(worldX, yHeight * BLOCK_SIZE, worldZ, 'sand', 'overworld');
+                    addBlock(worldX, (yHeight - 1) * BLOCK_SIZE, worldZ, 'sand', 'overworld');
+                    addBlock(worldX, (yHeight - 2) * BLOCK_SIZE, worldZ, 'stone', 'overworld');
+                    if (Math.random() > 0.97) {
+                        const ch = Math.floor(Math.random() * 2) + 2; 
+                        for(let cy=1; cy<=ch; cy++) addBlock(worldX, (yHeight + cy) * BLOCK_SIZE, worldZ, 'cactus', 'overworld');
+                    }
+                }
+            }
         }
 
         function generateEndWorld() {
-            // Generate Island
             const size = 15;
             for (let x = -size; x < size; x++) {
                 for (let z = -size; z < size; z++) {
@@ -363,14 +376,10 @@
                     }
                 }
             }
-
-            // Obsidian Pillars
             const pillars = [[8, 8], [-8, -8], [8, -8], [-8, 8]];
             pillars.forEach(coord => {
                 const h = 5 + Math.floor(Math.random() * 5);
-                for(let y=1; y<h; y++) {
-                    addBlock(coord[0] * BLOCK_SIZE, y * BLOCK_SIZE, coord[1] * BLOCK_SIZE, 'obsidian', 'the_end');
-                }
+                for(let y=1; y<h; y++) addBlock(coord[0] * BLOCK_SIZE, y * BLOCK_SIZE, coord[1] * BLOCK_SIZE, 'obsidian', 'the_end');
             });
         }
 
@@ -389,13 +398,14 @@
         }
 
         // --- MOBS SYSTEM ---
-        
         const mobs = []; 
         function spawnMob(x, y, z, type, dim) {
             if (!dim) dim = currentDim;
             const group = new THREE.Group();
             group.position.set(x, y, z);
-            
+            group.userData.isMob = true;
+            group.userData.type = type; // Store type on the group for raycasting identification
+
             const bodyW = 3, bodyH = 6, bodyD = 2;
             const headSize = 2.5;
             const skinMat = type === 'zombie' ? materials.zombieSkin : materials.villagerSkin;
@@ -420,17 +430,13 @@
             if (type === 'zombie') { armR.rotation.x = -Math.PI / 2; armR.position.set(2, 5, 2); }
             group.add(armR);
 
-            // Add to Dimension Group instead of Scene
             dimensions[dim].group.add(group);
-
             mobs.push({ mesh: group, type: type, velocity: new THREE.Vector3(0, 0, 0), isDead: false, dim: dim });
         }
 
-        // --- INIT ---
         generateOverworld();
         scene.add(dimensions.overworld.group);
         scene.background = new THREE.Color(dimensions.overworld.skyColor);
-
 
         // --- PLAYER CONTROLS ---
         const yawObject = new THREE.Object3D();
@@ -445,10 +451,9 @@
         let canJump = false, isFlying = false;
         let velocity = new THREE.Vector3();
         let direction = new THREE.Vector3();
-
         const controls = { isLocked: false };
+        let debugVisible = false;
 
-        // Event Listeners
         const instructions = document.getElementById('instructions');
         instructions.addEventListener('click', () => document.body.requestPointerLock());
         document.addEventListener('pointerlockchange', () => {
@@ -465,6 +470,12 @@
 
         let lastSpaceTime = 0;
         document.addEventListener('keydown', (event) => {
+            if (event.code === 'F3') {
+                event.preventDefault();
+                debugVisible = !debugVisible;
+                document.getElementById('debug-menu').style.display = debugVisible ? 'block' : 'none';
+                return;
+            }
             switch (event.code) {
                 case 'KeyW': moveForward = true; break;
                 case 'KeyA': moveLeft = true; break;
@@ -487,6 +498,8 @@
                 case 'Digit5': selectBlock(4); break;
                 case 'Digit6': selectBlock(5); break;
                 case 'Digit7': selectBlock(6); break;
+                case 'Digit8': selectBlock(7); break;
+                case 'Digit9': selectBlock(8); break;
             }
         });
 
@@ -502,41 +515,24 @@
         });
 
         function selectBlock(index) {
+            if (index >= blockTypes.length) return;
             currentBlockType = blockTypes[index];
             document.querySelectorAll('.slot').forEach((el, i) => {
                 el.classList.toggle('active', i === index);
             });
         }
 
-        // --- PORTAL LOGIC (Fixed) ---
         function checkPortal(originX, originY, originZ) {
             const world = getActiveWorld();
-            
-            // Instead of guessing one center, we scan a 5x5 area around the placed block
-            // to see if ANY valid portal center exists near it.
-            // This allows you to complete the portal from any block (corner, edge, etc.)
-            
-            // Search area relative to placed block
             for (let cx = originX - 3*BLOCK_SIZE; cx <= originX + 3*BLOCK_SIZE; cx += BLOCK_SIZE) {
                 for (let cz = originZ - 3*BLOCK_SIZE; cz <= originZ + 3*BLOCK_SIZE; cz += BLOCK_SIZE) {
-                    
-                    // Assume (cx, originY, cz) is the CENTER of the 3x3 portal
-                    // We check if the 12 frames around it are filled
-                    
                     let isComplete = true;
-                    
-                    // Check 12 frame positions
                     const requiredOffsets = [
-                        // North (z-2)
                         {x:-1, z:-2}, {x:0, z:-2}, {x:1, z:-2},
-                        // South (z+2)
                         {x:-1, z:2}, {x:0, z:2}, {x:1, z:2},
-                        // West (x-2)
                         {x:-2, z:-1}, {x:-2, z:0}, {x:-2, z:1},
-                        // East (x+2)
                         {x:2, z:-1}, {x:2, z:0}, {x:2, z:1}
                     ];
-                    
                     for(let off of requiredOffsets) {
                         const frameX = cx + off.x * BLOCK_SIZE;
                         const frameZ = cz + off.z * BLOCK_SIZE;
@@ -545,11 +541,7 @@
                             break;
                         }
                     }
-                    
-                    if (isComplete) {
-                        spawnPortal(cx, originY, cz);
-                        return; // Found it, stop looking
-                    }
+                    if (isComplete) { spawnPortal(cx, originY, cz); return; }
                 }
             }
         }
@@ -560,16 +552,11 @@
         }
 
         function spawnPortal(cx, y, cz) {
-            // Fill 3x3 center
             for(let dx=-1; dx<=1; dx++) {
-                for(let dz=-1; dz<=1; dz++) {
-                    addBlock(cx + dx*BLOCK_SIZE, y, cz + dz*BLOCK_SIZE, 'portal'); 
-                }
+                for(let dz=-1; dz<=1; dz++) addBlock(cx + dx*BLOCK_SIZE, y, cz + dz*BLOCK_SIZE, 'portal'); 
             }
         }
 
-
-        // --- INTERACTION ---
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0, 0);
         const highlightMesh = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE+0.1, BLOCK_SIZE+0.1, BLOCK_SIZE+0.1), materials.hover);
@@ -585,14 +572,11 @@
                 const intersect = intersects[0];
                 const obj = intersect.object;
 
-                if (event.button === 0) { // Break
-                    if (obj.userData.type !== 'bedrock') removeBlock(obj); // Bedrock check optional
-                } else if (event.button === 2) { // Place / Use
-                    
-                    // SPECIAL INTERACTION: EYE OF ENDER
+                if (event.button === 0) { 
+                    if (obj.userData.type !== 'bedrock') removeBlock(obj); 
+                } else if (event.button === 2) { 
                     if (currentBlockType === 'eye_of_ender') {
                         if (obj.userData.type === 'end_frame') {
-                            // Convert to filled frame
                             const pos = obj.position.clone();
                             removeBlock(obj);
                             addBlock(pos.x, pos.y, pos.z, 'end_frame_filled');
@@ -600,39 +584,27 @@
                             return; 
                         }
                     }
-
-                    // NORMAL PLACEMENT
-                    if (currentBlockType === 'eye_of_ender') return; // Can't place eyes as blocks elsewhere
+                    if (currentBlockType === 'eye_of_ender') return;
 
                     const pos = intersect.point.add(intersect.face.normal);
                     const x = Math.round(pos.x / BLOCK_SIZE) * BLOCK_SIZE;
                     const y = Math.round(pos.y / BLOCK_SIZE) * BLOCK_SIZE;
                     const z = Math.round(pos.z / BLOCK_SIZE) * BLOCK_SIZE;
-
-                    // Player collision check
                     const p = yawObject.position;
                     if (Math.abs(x - p.x) < BLOCK_SIZE && Math.abs(y - p.y) < BLOCK_SIZE * 2 && Math.abs(z - p.z) < BLOCK_SIZE) return;
-
                     addBlock(x, y, z, currentBlockType);
                 }
             }
         });
 
-        // --- PHYSICS LOOP ---
         let prevTime = performance.now();
-
         function updatePhysics(delta) {
-            // Determine active world objects
             const world = getActiveWorld();
-            
-            // Standard movement logic
-            // Drag
             velocity.x -= velocity.x * 10.0 * delta;
             velocity.z -= velocity.z * 10.0 * delta;
             if(isFlying) velocity.y -= velocity.y * 10.0 * delta;
             else velocity.y -= 9.8 * 70.0 * delta;
 
-            // Input
             direction.z = Number(moveForward) - Number(moveBackward);
             direction.x = Number(moveRight) - Number(moveLeft);
             direction.normalize();
@@ -648,46 +620,30 @@
                 if (moveUp) velocity.y += 400 * delta;
                 if (moveDown) velocity.y -= 400 * delta;
             }
-
-            // Apply Pos
             yawObject.position.add(velocity.clone().multiplyScalar(delta));
 
-            // Collision
             if (!isFlying) {
-                // Check for Portal Collision (Improved)
-                // Raycast from head (yawObject) down to feet (length 12 covers the 10 unit height + buffer)
                 const portalRay = new THREE.Raycaster(yawObject.position, new THREE.Vector3(0, -1, 0), 0, 12);
                 const portalHits = portalRay.intersectObjects(world.objects);
-                // Check if we are intersecting a portal block
                 const inPortal = portalHits.some(h => h.object.userData.type === 'portal' && h.distance < 12);
                 
                 if (inPortal) {
                     switchDimension(currentDim === 'overworld' ? 'the_end' : 'overworld');
-                    return; // Teleported
+                    return; 
                 }
 
-                // Ground Collision (Multipoint)
-                const offsets = [
-                    new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 0, 2),
-                    new THREE.Vector3(-2, 0, 2), new THREE.Vector3(2, 0, -2),
-                    new THREE.Vector3(-2, 0, -2)
-                ];
+                const offsets = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 0, 2), new THREE.Vector3(-2, 0, 2), new THREE.Vector3(2, 0, -2), new THREE.Vector3(-2, 0, -2)];
                 let groundY = -Infinity;
                 let found = false;
-
                 for(let o of offsets) {
                     const origin = yawObject.position.clone().add(o); 
                     const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 12);
                     const hits = ray.intersectObjects(world.objects);
-                    
-                    // FIX: Find the first hit that is NOT a portal
                     const validHit = hits.find(h => h.object.userData.type !== 'portal');
-                    
                     if (validHit) {
                         if(validHit.point.y > groundY) { groundY = validHit.point.y; found = true; }
                     }
                 }
-
                 if (found) {
                     const dist = yawObject.position.y - 10 - groundY;
                     if (dist < 1.5 && velocity.y <= 0) {
@@ -697,131 +653,148 @@
                     } else canJump = false;
                 } else canJump = false;
             }
-
             if (yawObject.position.y < -100) {
                 yawObject.position.set(0, 50, 0);
                 velocity.set(0, 0, 0);
-                if(currentDim === 'the_end') switchDimension('overworld'); // Fall out of end -> overworld
+                if(currentDim === 'the_end') switchDimension('overworld'); 
             }
-        } // <-- MISSING CLOSING BRACE 1 ADDED HERE
+        }
 
-        // Mob Update (Fixed AI Logic + Cliff Avoidance)
         function updateMobs(delta) {
             mobs.forEach(mob => {
-                // Only update mobs in current dimension
                 if (mob.dim !== currentDim || mob.isDead) {
                     mob.mesh.visible = false;
                     return;
                 }
                 mob.mesh.visible = true;
-                
-                // AI LOGIC RESTORED
                 let target = null;
-                let minDist = 100; // aggro range
-
-                // Find target
+                let minDist = 100; 
                 if (mob.type === 'zombie') {
-                    // Zombie hunts closest villager
                     mobs.forEach(other => {
                         if (other.type === 'villager' && !other.isDead && other.dim === currentDim) {
                             const dist = mob.mesh.position.distanceTo(other.mesh.position);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                target = other.mesh.position;
-                            }
+                            if (dist < minDist) { minDist = dist; target = other.mesh.position; }
                         }
                     });
-                    
-                    // Attack logic
                     if (minDist < 3 && target) {
                          const victim = mobs.find(m => m.type === 'villager' && m.mesh.position.equals(target));
-                         if (victim) {
-                             dimensions[currentDim].group.remove(victim.mesh); // Remove from Group
-                             victim.isDead = true;
-                             return; 
-                         }
+                         if (victim) { dimensions[currentDim].group.remove(victim.mesh); victim.isDead = true; return; }
                     }
-
                 } else {
-                    // Villager flees from closest zombie
                     mobs.forEach(other => {
                         if (other.type === 'zombie' && !other.isDead && other.dim === currentDim) {
                             const dist = mob.mesh.position.distanceTo(other.mesh.position);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                target = other.mesh.position;
-                            }
+                            if (dist < minDist) { minDist = dist; target = other.mesh.position; }
                         }
                     });
                 }
-
-                // Movement
                 const speed = mob.type === 'zombie' ? 15 : 20; 
                 const moveDir = new THREE.Vector3(0, 0, 0);
-
                 if (target) {
-                    if (mob.type === 'zombie') {
-                        moveDir.subVectors(target, mob.mesh.position).normalize();
-                    } else {
-                        // Flee
-                        moveDir.subVectors(mob.mesh.position, target).normalize();
-                    }
+                    if (mob.type === 'zombie') moveDir.subVectors(target, mob.mesh.position).normalize();
+                    else moveDir.subVectors(mob.mesh.position, target).normalize();
                     
-                    // --- CLIFF AVOIDANCE ---
-                    // Cast a ray slightly ahead to check if there is ground
-                    const lookAheadDist = 4;
-                    const checkPos = mob.mesh.position.clone().add(moveDir.clone().multiplyScalar(lookAheadDist)).add(new THREE.Vector3(0, 5, 0));
-                    
+                    const checkPos = mob.mesh.position.clone().add(moveDir.clone().multiplyScalar(4)).add(new THREE.Vector3(0, 5, 0));
                     const cliffRay = new THREE.Raycaster(checkPos, new THREE.Vector3(0, -1, 0), 0, 15);
-                    const groundHits = cliffRay.intersectObjects(getActiveWorld().objects);
-                    
-                    // If ground detected ahead, it's safe to move
-                    if (groundHits.length > 0) {
-                        // Look at target
+                    if (cliffRay.intersectObjects(getActiveWorld().objects).length > 0) {
                         if (mob.type === 'zombie') mob.mesh.lookAt(target.x, mob.mesh.position.y, target.z);
                         else mob.mesh.lookAt(mob.mesh.position.x + moveDir.x, mob.mesh.position.y, mob.mesh.position.z + moveDir.z);
-
                         mob.velocity.x = moveDir.x * speed;
                         mob.velocity.z = moveDir.z * speed;
-                    } else {
-                        // STOP! Cliff detected.
-                        mob.velocity.x = 0;
-                        mob.velocity.z = 0;
-                    }
-                    
-                } else {
-                    // Friction
-                    mob.velocity.x *= 0.9;
-                    mob.velocity.z *= 0.9;
-                }
+                    } else { mob.velocity.x = 0; mob.velocity.z = 0; }
+                } else { mob.velocity.x *= 0.9; mob.velocity.z *= 0.9; }
                 
-                // Gravity
                 mob.velocity.y -= 9.8 * 50.0 * delta;
-
-                // Auto Jump
                 if (target && (mob.velocity.x !== 0 || mob.velocity.z !== 0)) {
                      const forwardRay = new THREE.Raycaster(mob.mesh.position, moveDir.normalize(), 0, 4);
-                     if (forwardRay.intersectObjects(getActiveWorld().objects).length > 0 && mob.velocity.y <= 0) {
-                          mob.velocity.y = 60; 
-                     }
+                     if (forwardRay.intersectObjects(getActiveWorld().objects).length > 0 && mob.velocity.y <= 0) mob.velocity.y = 60; 
                 }
-
                 mob.mesh.position.add(mob.velocity.clone().multiplyScalar(delta));
-                
-                // Collision (Simple)
                 const origin = mob.mesh.position.clone().add(new THREE.Vector3(0, 3, 0));
                 const ray = new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0), 0, 10);
                 const hits = ray.intersectObjects(getActiveWorld().objects);
                 if(hits.length > 0) {
                      const groundY = hits[0].point.y;
                      const dist = mob.mesh.position.y - groundY;
-                     if (dist < 1.0 && dist > -5.0 && mob.velocity.y <= 0) {
-                        mob.velocity.y = 0;
-                        mob.mesh.position.y = groundY;
-                     }
+                     if (dist < 1.0 && dist > -5.0 && mob.velocity.y <= 0) { mob.velocity.y = 0; mob.mesh.position.y = groundY; }
                 }
                 if(mob.mesh.position.y < -100) mob.isDead = true;
             });
+        }
+
+        // --- DEBUG INFO ---
+        function updateDebugInfo() {
+            if (!debugVisible) return;
+
+            const x = yawObject.position.x.toFixed(1);
+            const y = yawObject.position.y.toFixed(1);
+            const z = yawObject.position.z.toFixed(1);
+            
+            // Biome Logic
+            let biome = "Void";
+            if (currentDim === 'overworld') {
+                if (yawObject.position.x > 20) biome = "Desert";
+                else biome = "Forest/Plains";
+            } else if (currentDim === 'the_end') {
+                biome = "The End";
+            }
+
+            // Raycast for Target Block & Entity
+            raycaster.setFromCamera(center, camera);
+            const world = getActiveWorld();
+            
+            // Check Blocks
+            const blockIntersects = raycaster.intersectObjects(world.objects);
+            let targetBlock = "None";
+            let targetBlockPos = "";
+            
+            if (blockIntersects.length > 0 && blockIntersects[0].distance < 50) {
+                targetBlock = blockIntersects[0].object.userData.type;
+                const p = blockIntersects[0].object.position;
+                targetBlockPos = `[${p.x}, ${p.y}, ${p.z}]`;
+            }
+
+            // Check Entities (Mobs)
+            // Collect all mob meshes in current dimension
+            const activeMobMeshes = [];
+            mobs.forEach(m => {
+                if (m.dim === currentDim && !m.isDead) activeMobMeshes.push(m.mesh);
+            });
+            
+            // Raycast recursively against mob groups
+            const mobIntersects = raycaster.intersectObjects(activeMobMeshes, true); // true for recursive
+            let targetEntity = "None";
+            
+            if (mobIntersects.length > 0 && mobIntersects[0].distance < 50) {
+                // Find the parent group that has the userData
+                let obj = mobIntersects[0].object;
+                while(obj.parent && !obj.userData.isMob) {
+                    obj = obj.parent;
+                }
+                if (obj.userData.isMob) {
+                    targetEntity = obj.userData.type;
+                }
+            }
+
+            const left = `
+Minecraft JS Clone 1.0
+${renderer.info.render.frame} fps
+XYZ: ${x} / ${y} / ${z}
+Block: ${x >> 0} ${y >> 0} ${z >> 0}
+Biome: ${biome}
+Dimension: ${currentDim}
+Targeted Block: ${targetBlock} ${targetBlockPos}
+Targeted Entity: ${targetEntity}
+            `;
+            
+            const right = `
+JS Heap: ${(performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(0) : 'N/A')} MB
+Three.js Geometries: ${renderer.info.memory.geometries}
+Three.js Textures: ${renderer.info.memory.textures}
+            `;
+
+            document.getElementById('debug-left').innerText = left;
+            document.getElementById('debug-right').innerText = right;
         }
 
         function animate() {
@@ -831,8 +804,6 @@
             
             if (controls.isLocked) {
                 updatePhysics(delta);
-                
-                // Update Highlight
                 raycaster.setFromCamera(center, camera);
                 const intersects = raycaster.intersectObjects(getActiveWorld().objects);
                 if (intersects.length > 0) {
@@ -842,6 +813,7 @@
             }
             
             updateMobs(delta);
+            updateDebugInfo(); // Run debug update
             prevTime = time;
             renderer.render(scene, camera);
         }
@@ -853,7 +825,6 @@
         });
 
         animate();
-
     </script>
 </body>
 </html>
