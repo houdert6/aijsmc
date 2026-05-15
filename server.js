@@ -1,16 +1,22 @@
 const WebSocket = require('ws');
+const fs = require('fs');
+const { spawn } = require('child_process');
+
 const wss = new WebSocket.Server({host: '0.0.0.0', port: 25565 });
 
 // --- SERVER WORLD STATE ---
-// players: id -> {id, x, y, z, dim, username, mode, health, maxHealth, inventory: { type: count }, lastDamageTime: 0}
 const players = new Map(); 
 const mobs = [];
-// worldBlocks: "x,y,z,dim" -> { type: string, state: object }
 const worldBlocks = new Map(); 
-const villagePOIs = []; // Store interesting locations {x, y, z, type}
-const projectiles = []; // { id, x, y, z, vx, vy, vz, dim, ownerId, life }
-const spawners = []; // { x, y, z, dim, timer, mobType }
+const villagePOIs = []; 
+const projectiles = []; 
+const spawners = []; 
 let hostId = null;
+
+// Anomaly State Tracking
+let hostHTMLSnapshot = null;
+let pendingSessions = new Map(); // sessionId -> Saved Player Data
+let hostSessionId = null;
 
 // Timing & Day/Night Cycle
 let prevTime = performance.now();
@@ -113,9 +119,52 @@ function generateDesert() {
     generateVillage((offset + size/2) * BLOCK_SIZE, 0 * BLOCK_SIZE);
 }
 
+function generateIgloo(cx, cy, cz, dim) {
+    // Dome
+    for(let dx=-2; dx<=2; dx++) {
+        for(let dz=-2; dz<=2; dz++) {
+            for(let dy=0; dy<=3; dy++) {
+                const wx = cx + dx*BLOCK_SIZE; const wy = cy + dy*BLOCK_SIZE; const wz = cz + dz*BLOCK_SIZE;
+                if (dy === 3 && (Math.abs(dx)===2 || Math.abs(dz)===2)) continue;
+                if (dy > 0 && dy < 3 && Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
+                if (dy > 0 && dy < 3 && dx === 2 && dz === 0) continue; 
+                
+                const k = getKey(wx, wy, wz, dim);
+                if (worldBlocks.has(k)) worldBlocks.delete(k);
+                addBlock(wx, wy, wz, 'snow_block', dim);
+            }
+        }
+    }
+    // Basement
+    const by = cy - 12*BLOCK_SIZE;
+    for(let dx=-3; dx<=3; dx++) {
+        for(let dz=-3; dz<=3; dz++) {
+            for(let dy=-1; dy<=4; dy++) {
+                const wx = cx + dx*BLOCK_SIZE; const wy = by + dy*BLOCK_SIZE; const wz = cz + dz*BLOCK_SIZE;
+                const k = getKey(wx, wy, wz, dim);
+                if (worldBlocks.has(k)) worldBlocks.delete(k);
+                
+                if (dy === -1) { addBlock(wx, wy, wz, 'obsidian', dim); }
+                else if (dy === 4 || Math.abs(dx) === 3 || Math.abs(dz) === 3) { addBlock(wx, wy, wz, 'stone', dim); }
+            }
+        }
+    }
+    // Shaft
+    for(let dy=0; dy>=-12; dy--) {
+        const wy = cy + dy*BLOCK_SIZE;
+        const k = getKey(cx, wy, cz, dim);
+        if (worldBlocks.has(k)) worldBlocks.delete(k);
+    }
+    // Safe landing
+    addBlock(cx, cy - 11*BLOCK_SIZE, cz, 'water', dim, {level: 8});
+    // Door
+    addBlock(cx, by, cz - 2*BLOCK_SIZE, 'mysterious_door', dim, { open: false });
+}
+
 function generateIceSpikesBiome() {
-    const offset = -100; // Moved further away (was -40)
+    const offset = -100; 
     const size = 60;
+    let iglooGenerated = false;
     
     for (let x = 0; x < size; x++) {
         for (let z = -size/2; z < size/2; z++) {
@@ -131,22 +180,27 @@ function generateIceSpikesBiome() {
             addBlock(worldX, (yHeight - 1) * BLOCK_SIZE, worldZ, 'dirt', 'overworld');
             addBlock(worldX, (yHeight - 2) * BLOCK_SIZE, worldZ, 'stone', 'overworld');
 
-            // Ice Spikes Generation
+            // Ice Spikes & Igloo Generation
             if (Math.random() > 0.985) {
-                const height = 10 + Math.floor(Math.random() * 15); // Tall spikes
-                const isThick = Math.random() > 0.7; // 30% chance for thick spike
+                if (!iglooGenerated && Math.random() > 0.8) {
+                    generateIgloo(worldX, yHeight * BLOCK_SIZE, worldZ, 'overworld');
+                    iglooGenerated = true;
+                } else {
+                    const height = 10 + Math.floor(Math.random() * 15); // Tall spikes
+                    const isThick = Math.random() > 0.7; // 30% chance for thick spike
 
-                for (let i = 1; i <= height; i++) {
-                    const py = (yHeight + i) * BLOCK_SIZE;
-                    
-                    // Thin Spike
-                    addBlock(worldX, py, worldZ, 'packed_ice', 'overworld');
-                    
-                    // Thick Spike Base (Tapers off near top)
-                    if (isThick && i < height * 0.7) {
-                        addBlock(worldX + BLOCK_SIZE, py, worldZ, 'packed_ice', 'overworld');
-                        addBlock(worldX, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
-                        addBlock(worldX + BLOCK_SIZE, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
+                    for (let i = 1; i <= height; i++) {
+                        const py = (yHeight + i) * BLOCK_SIZE;
+                        
+                        // Thin Spike
+                        addBlock(worldX, py, worldZ, 'packed_ice', 'overworld');
+                        
+                        // Thick Spike Base (Tapers off near top)
+                        if (isThick && i < height * 0.7) {
+                            addBlock(worldX + BLOCK_SIZE, py, worldZ, 'packed_ice', 'overworld');
+                            addBlock(worldX, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
+                            addBlock(worldX + BLOCK_SIZE, py, worldZ + BLOCK_SIZE, 'packed_ice', 'overworld');
+                        }
                     }
                 }
             }
@@ -623,10 +677,24 @@ function generateLake(dim) {
 }
 
 function initWorld() {
-    console.log("Generating Server World...");
-    generateOverworld();
-    generateEndWorld();
-    generateNether();
+    if (fs.existsSync('anomaly_server_state.json')) {
+        console.log("Loading Anomalous Server State...");
+        const state = JSON.parse(fs.readFileSync('anomaly_server_state.json', 'utf8'));
+        
+        state.blocks.forEach(b => worldBlocks.set(b.key, b.val));
+        mobs.push(...state.mobs);
+        state.players.forEach(p => pendingSessions.set(p.sessionId, p));
+        hostSessionId = state.hostSessionId;
+        worldTime = state.worldTime;
+        hostHTMLSnapshot = state.hostHTMLSnapshot;
+        
+        fs.unlinkSync('anomaly_server_state.json');
+    } else {
+        console.log("Generating Server World...");
+        generateOverworld();
+        generateEndWorld();
+        generateNether();
+    }
 }
 
 function addBlock(x, y, z, type, dim, state = {}) {
@@ -1335,7 +1403,8 @@ function updateMobs(delta) {
         }
 
         // Apply Movement & Avoidance (Zombie & Pigman)
-        if (target && (mob.type === 'zombie' || mob.type === 'pigman')) {
+        const isKnockedBack = Math.abs(mob.vx) > 50 || Math.abs(mob.vz) > 50;
+        if (target && (mob.type === 'zombie' || mob.type === 'pigman') && !isKnockedBack) {
             mob.lookAt = {x: target.x, y: mob.y, z: target.z};
             const dx = target.x - mob.x;
             const dz = target.z - mob.z;
@@ -1350,7 +1419,7 @@ function updateMobs(delta) {
                 const k = getKey(Math.round(nextX/5)*5, Math.round(mob.y/5)*5, Math.round(nextZ/5)*5, mob.dim);
                 const block = worldBlocks.get(k);
                 
-                const isClosedDoor = block && block.type === 'door' && (!block.state || !block.state.open);
+                const isClosedDoor = block && (block.type === 'door' || block.type === 'mysterious_door') && (!block.state || !block.state.open);
                 if (isClosedDoor) {
                      mob.vx = 0; mob.vz = 0;
                 } else if(block && block.type !== 'air' && block.type !== 'crop' && !block.type.includes('door') && block.type !== 'water') {
@@ -1359,8 +1428,13 @@ function updateMobs(delta) {
             }
         } else if (mob.type === 'zombie' || mob.type === 'pigman') {
             // Friction
-            mob.vx *= 0.9;
-            mob.vz *= 0.9;
+            if (isKnockedBack) {
+                mob.vx -= mob.vx * 2.0 * delta;
+                mob.vz -= mob.vz * 2.0 * delta;
+            } else {
+                mob.vx *= 0.9;
+                mob.vz *= 0.9;
+            }
         }
 
         if (mob.y < -100) mob.isDead = true;
@@ -1557,7 +1631,8 @@ function getStarterInventory() {
         'snow_block': 0,
         'netherrack': 0, 'glowstone': 0, 'flint_and_steel': 1,
         'blaze_rod': 0, 'nether_brick': 0, 'spawner': 0,
-        'quartz_ore': 0, 'magma': 0, 'red_mushroom': 0, 'quartz': 0, 'gold_nugget': 0
+        'quartz_ore': 0, 'magma': 0, 'red_mushroom': 0, 'quartz': 0, 'gold_nugget': 0,
+        'hammer': 1, 'mysterious_door': 0
     };
 }
 
@@ -1571,26 +1646,35 @@ wss.on('connection', ws => {
         hostId = id;
     }
 
-    players.set(id, { 
-        id: id, 
-        x: 0, y: 60, z: 0, 
-        dim: 'overworld', 
-        username: 'Guest', 
-        mode: mode,
-        health: 20,
-        maxHealth: 20,
-        inventory: getStarterInventory(),
-        lastDamageTime: 0
-    });
+    // Placeholder initial state. Will be overwritten on join if restoring a session.
+    let initialPlayer = { 
+        id: id, sessionId: Math.random().toString(36).substr(2, 9),
+        x: 0, y: 60, z: 0, dim: 'overworld', username: 'Guest', mode: mode,
+        health: 20, maxHealth: 20, inventory: getStarterInventory(), lastDamageTime: 0
+    };
+    players.set(id, initialPlayer);
 
     ws.on('message', msg => {
         try {
             const d = JSON.parse(msg);
-            const p = players.get(id);
+            let p = players.get(id);
             
             if(d.type === 'join') {
-                p.username = d.username;
-                console.log(`${d.username} joined as ${p.mode}`);
+                // Check if this is a reconnecting client post-anomaly
+                if (d.sessionId && pendingSessions.has(d.sessionId)) {
+                    const savedPlayer = pendingSessions.get(d.sessionId);
+                    savedPlayer.id = id;
+                    savedPlayer.username = d.username;
+                    players.set(id, savedPlayer);
+                    pendingSessions.delete(d.sessionId);
+                    p = savedPlayer; // Update reference
+                    
+                    if (hostSessionId === d.sessionId) hostId = id;
+                    console.log(`${d.username} reconnected to anomalous reality.`);
+                } else {
+                    p.username = d.username;
+                    console.log(`${d.username} joined as ${p.mode}`);
+                }
                 
                 ws.send(JSON.stringify({
                     type: 'gamemode',
@@ -1705,6 +1789,12 @@ wss.on('connection', ws => {
                     } else {
                         mob.health--;
                         
+                        if (d.weapon === 'hammer') {
+                            mob.vy = 500;
+                            mob.vx = (d.dirX || 0) * 1000;
+                            mob.vz = (d.dirZ || 0) * 1000;
+                        }
+
                         // Pigman Aggro (Immediate on Hit)
                         if (mob.type === 'pigman') {
                             mob.aiState.mode = 'aggressive';
@@ -1728,7 +1818,17 @@ wss.on('connection', ws => {
                         targetPlayer.health--;
                         
                         const victimClient = getClientById(targetPlayer.id);
-                        if (victimClient) victimClient.send(JSON.stringify({ type: 'damage', health: targetPlayer.health }));
+                        if (victimClient) {
+                            victimClient.send(JSON.stringify({ type: 'damage', health: targetPlayer.health }));
+                            if (d.weapon === 'hammer') {
+                                victimClient.send(JSON.stringify({
+                                    type: 'knockback',
+                                    vx: (d.dirX || 0) * 1000,
+                                    vy: 500,
+                                    vz: (d.dirZ || 0) * 1000
+                                }));
+                            }
+                        }
                         
                         if (targetPlayer.health <= 0) {
                             targetPlayer.health = 20;
@@ -1888,7 +1988,131 @@ wss.on('connection', ws => {
                 }));
             }
 
-        } catch(e) {}
+            // --- MULTIPLAYER ANOMALIES ---
+            if (d.type === 'host_snapshot') {
+                hostHTMLSnapshot = d.html;
+                console.log("Received pristine reality snapshot from Host.");
+            }
+
+            if (d.type === 'trigger_anomaly') {
+                if (!hostHTMLSnapshot) {
+                    console.error("Cannot trigger anomaly: No host snapshot available.");
+                    return;
+                }
+                console.log("Anomaly triggered in MP! Contacting higher dimensions...");
+                
+                // Process the OpenAI request asynchronously so the server event loop doesn't block entirely
+                (async () => {
+                    try {
+                        const serverSource = fs.readFileSync(__filename, 'utf8');
+                        
+                        const promptStr = `You are an anomalous AI entity altering a Javascript voxel game.
+The game has a Client (HTML) and a Server (Node.js). I will provide both source codes.
+Your task: Add 2 or 3 simple, obvious, and eerie SCP-like anomalies simultaneously.
+You MUST include an equal balance of changes that affect GAMEPLAY (Server physics/mechanics) and AMBIENCE (Client visuals/audio).
+DO NOT add new mobs or complex AI loops.
+
+Output ONLY diff blocks. Format:
+<<<<<<< SEARCH
+[exact original code]
+=======
+[new anomalous code]
+>>>>>>> REPLACE
+
+You can target both the Client and Server code in your diffs. Make sure the SEARCH block matches exactly. Keep code robust.`;
+                        
+                        const userContent = `=== CLIENT HTML ===\n${hostHTMLSnapshot}\n\n=== SERVER JS ===\n${serverSource}`;
+                        
+                        // Native fetch (requires Node v18+)
+                        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${d.apiKey}` },
+                            body: JSON.stringify({
+                                model: 'gpt-5-mini',
+                                messages: [
+                                    { role: 'system', content: promptStr },
+                                    { role: 'user', content: userContent }
+                                ],
+                                max_completion_tokens: 32000
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.error) throw new Error(data.error.message);
+                        
+                        const patch = data.choices[0].message.content;
+                        
+                        // Patch Applicator Function
+                        const applyPatches = (src, ptch) => {
+                            let newSrc = src;
+                            let searchIdx = ptch.indexOf('<<<<<<< SEARCH');
+                            let count = 0;
+                            while(searchIdx >= 0) {
+                                const pp = ptch.indexOf('=======', searchIdx);
+                                const rp = ptch.indexOf('>>>>>>> REPLACE', searchIdx);
+                                if(pp < 0 || rp < 0) break;
+                                
+                                let findStr = ptch.substring(searchIdx + 14, pp).trim();
+                                let replaceStr = ptch.substring(pp + 7, rp).replace(/^\n|\n$/g, '');
+                                
+                                let escapedFind = findStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                let lenientRegexStr = escapedFind.replace(/\s+/g, '\\s+');
+                                
+                                try {
+                                    const rx = new RegExp(lenientRegexStr, 'g');
+                                    if(rx.test(newSrc)) { 
+                                        newSrc = newSrc.replace(rx, () => replaceStr); 
+                                        count++; 
+                                    }
+                                } catch(e) {}
+                                searchIdx = ptch.indexOf('<<<<<<< SEARCH', rp);
+                            }
+                            return { patched: newSrc, count: count };
+                        };
+                        
+                        const clientRes = applyPatches(hostHTMLSnapshot, patch);
+                        const serverRes = applyPatches(serverSource, patch);
+                        console.log(`Anomaly shifts applied: Client(${clientRes.count}), Server(${serverRes.count})`);
+                        
+                        // Save State for Migration
+                        const stateToSave = {
+                            blocks: Array.from(worldBlocks.entries()).map(([k, v]) => ({ key: k, val: v })),
+                            mobs: mobs,
+                            players: Array.from(players.values()),
+                            hostSessionId: players.get(hostId)?.sessionId,
+                            worldTime: worldTime,
+                            hostHTMLSnapshot: clientRes.patched
+                        };
+                        fs.writeFileSync('anomaly_server_state.json', JSON.stringify(stateToSave));
+                        
+                        // Broadcast to all clients to reboot
+                        wss.clients.forEach(c => {
+                            if (c.readyState === WebSocket.OPEN) {
+                                const pData = players.get(c.playerId);
+                                if (pData) {
+                                    c.send(JSON.stringify({
+                                        type: 'reality_rewritten',
+                                        newHTML: clientRes.patched,
+                                        sessionId: pData.sessionId
+                                    }));
+                                }
+                            }
+                        });
+                        
+                        // Write temporary server script and spawn detached process
+                        fs.writeFileSync('temp_server.js', serverRes.patched);
+                        console.log("Rebooting server into anomalous reality...");
+                        const child = spawn(process.argv[0], ['temp_server.js'], { detached: true, stdio: 'inherit' });
+                        child.unref();
+                        process.exit();
+                        
+                    } catch(e) {
+                        console.error("MP Anomaly failed:", e);
+                    }
+                })();
+            }
+
+        } catch(e) { console.error("Error handling message:", e); }
     });
     
     ws.on('close', () => {
@@ -1936,5 +2160,3 @@ setInterval(() => {
         });
     }
 }, 50);
-
-console.log("Server running on ws://localhost:8080");
