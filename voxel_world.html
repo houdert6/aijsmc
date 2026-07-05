@@ -401,7 +401,7 @@
             border: 2px solid #1db954;
             border-radius: 8px;
             padding: 10px;
-            z-index: 85;
+            z-index: 250;
             color: white;
             font-family: 'Courier New', Courier, monospace;
         }
@@ -479,8 +479,37 @@
         }
         #timing-target { position: absolute; left: 45%; width: 10%; height: 100%; background: #00ff00; }
         #timing-cursor { position: absolute; left: 0; top: -5px; width: 6px; height: 40px; background: white; box-shadow: 0 0 5px white; }
+
+        /* QUIZ MAKER UI */
+        #qm-panel {
+            display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+            width: 800px; max-width: 90vw; height: 80vh; background: rgba(10, 10, 20, 0.95);
+            border: 2px solid #aaddff; border-radius: 8px; color: white;
+            font-family: 'Courier New', Courier, monospace; z-index: 100;
+            flex-direction: column; box-shadow: 0 0 20px #00aaff;
+        }
+        .qm-hidden { display: none !important; }
+        #qm-header { display: flex; justify-content: space-between; padding: 10px; background: #004488; border-bottom: 2px solid #aaddff; align-items: center; }
+        #qm-header h3 { margin: 0; }
+        #qm-auth-bar { padding: 10px; background: #111; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; }
+        #qm-content { flex: 1; overflow-y: auto; padding: 15px; position: relative; }
+        .qm-btn { background: #00aaff; color: black; border: none; padding: 6px 12px; cursor: pointer; font-weight: bold; font-family: inherit; }
+        .qm-btn:hover { background: #55ccff; }
+        .qm-btn:disabled { background: #555; cursor: not-allowed; }
+        .qm-input { background: #000; color: #fff; border: 1px solid #55ccff; padding: 5px; font-family: inherit; }
+        .qm-quiz-card { border: 1px solid #55ccff; background: rgba(0,0,0,0.5); padding: 10px; margin-bottom: 10px; cursor: pointer; }
+        .qm-quiz-card:hover { border-color: #fff; }
+        .qm-tags { font-size: 11px; color: #00ffcc; }
+        .qm-question { background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 15px; border-left: 3px solid #00aaff; }
+        .qm-desc img { max-width: 100%; }
+        .qm-link { color: #00ffcc; text-decoration: none; font-size: 12px; float:right; }
+        .qm-link:hover { text-decoration: underline; }
+
+        #qm-dialog { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:300px; background:#111; border:2px solid #00aaff; padding:20px; text-align:center; z-index:200; box-shadow:0 0 10px #00aaff; }
+        #qm-dialog-text { margin-bottom:20px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -495,7 +524,7 @@
         <b>Voxel World</b><br>
         WASD to Move | SPACE to Jump/Fly | Shift to Sneak | Ctrl to Sprint<br>
         L-Click: Break/Attack | R-Click: Place/Toggle Door<br>
-        1-9: Select Item | <b>F3: Debug Info</b> | <b>F3+F4: Gamemode</b> | <b>T: Chat</b> | <b>P: Spotify</b><br>
+        1-9: Select Item | <b>F3: Debug Info</b> | <b>F3+F4: Gamemode</b> | <b>T: Chat</b> | <b>P: Spotify</b> | <b>Q: Quizzes</b><br>
         <span style="color: #0ff;">Find the Network Block in The End!</span>
     </div>
 
@@ -574,6 +603,201 @@
         <h2 style="color:#00ff00; text-align:center; margin-top:20px;">TENNA'S TV RUNNER</h2>
         <p style="color:white; text-align:center;">Use A and D to dodge the static! Survive for 10 seconds!</p>
         <canvas id="ch3-canvas" width="400" height="400" style="display:block; margin:0 auto; background:black; border:4px solid white;"></canvas>
+    </div>
+
+    <div id="qm-panel" style="display: none;">
+        <div id="qm-header">
+            <h3>Quiz Maker</h3>
+            <button class="qm-btn" style="background:#cc0000;color:white;" onclick="qmClose()">X</button>
+        </div>
+        <div id="qm-auth-bar">
+            <div id="qm-auth-status">Not logged in</div>
+            <div id="qm-auth-actions">
+                <input type="text" id="qm-user" class="qm-input" placeholder="Username">
+                <input type="password" id="qm-pass" class="qm-input" placeholder="Password">
+                <button class="qm-btn" onclick="qmLogInOut()" id="qm-btn-auth">Login</button>
+                <button class="qm-btn" onclick="qmForgotPassword()" id="qm-btn-fpass">Forgot Pass</button>
+                <button class="qm-btn" onclick="qmViewProfile(qmUserId)" id="qm-btn-prof" style="display:none;">Profile</button>
+            </div>
+        </div>
+        <div id="qm-content">
+            <div id="qm-view-list">
+                <div style="margin-bottom: 10px; display:flex; gap:10px;">
+                    <input type="text" id="qm-search-title" class="qm-input" placeholder="Search by title" style="flex:1" oninput="qmRenderList()">
+                    <input type="text" id="qm-search-tags" class="qm-input" placeholder="Tags (comma sep)" style="flex:1" oninput="qmRenderList()">
+                    <select id="qm-search-diff" class="qm-input" onchange="qmRenderList()">
+                        <option value="">Any Difficulty</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                        <option value="impossible">Impossible</option>
+                    </select>
+                    <button class="qm-btn" onclick="qmFetchQuizzes()">Refresh</button>
+                    <button class="qm-btn" onclick="qmCreateQuiz()" id="qm-btn-create" style="display:none; background:#00ff88;">+ Create Quiz</button>
+                </div>
+                <div id="qm-list-container"></div>
+            </div>
+            
+            <div id="qm-view-detail" style="display:none;">
+                <button class="qm-btn" onclick="qmShowView('list')">&lt; Back</button>
+                <button class="qm-btn" onclick="qmLoadEditor(qmCurrentQuiz.id)" id="qm-btn-edit" style="display:none; background:#ffaa00;">Edit Quiz</button>
+                <a id="qm-web-link" href="#" target="_blank" class="qm-link">Open in Browser ↗</a>
+                <h2 id="qm-detail-title" style="margin-top:10px;"></h2>
+                <div id="qm-detail-meta" style="color:#aaa; font-size:12px; margin-bottom:10px;"></div>
+                <a href="#" onclick="qmViewProfile(qmCurrentQuiz.owner)" style="color:#00aaff; font-size:12px;">View Author Profile</a>
+                <div id="qm-detail-desc" class="qm-desc" style="background:#111; padding:10px; border:1px solid #333; margin-top:10px;"></div>
+                <div style="margin-top:20px; text-align:center;">
+                    <button class="qm-btn" id="qm-btn-start" style="font-size:20px; padding:10px 30px;" onclick="qmStartQuiz()">START QUIZ</button>
+                </div>
+            </div>
+
+            <div id="qm-view-attempt" style="display:none;">
+                <h3 id="qm-attempt-title"></h3>
+                <div id="qm-attempt-questions"></div>
+                <button class="qm-btn" style="width:100%; margin-top:20px; font-size:18px;" onclick="qmSubmitQuiz()">SUBMIT ANSWERS</button>
+            </div>
+
+            <div id="qm-view-result" style="display:none; text-align:center;">
+                <h2>Results</h2>
+                <div id="qm-result-score" style="font-size:36px; margin:20px 0; color:#00ffcc;"></div>
+                <div id="qm-result-details" style="margin-bottom:20px;"></div>
+                <div id="qm-rate-box" style="display:none; background:#111; padding:20px; border:1px solid #555; text-align:left;">
+                    <h4>Rate this Quiz</h4>
+                    <label>Score (1-5): <input type="number" id="qm-rate-score" class="qm-input" min="1" max="5" value="5"></label><br><br>
+                    <label>Review (optional):<br><textarea id="qm-rate-review" class="qm-input" style="width:100%; height:60px;"></textarea></label><br><br>
+                    <button class="qm-btn" onclick="qmSubmitRating()">Submit Rating</button>
+                </div>
+                <br>
+                <button class="qm-btn" onclick="qmShowView('list')">Return to Quizzes</button>
+            </div>
+
+            <div id="qm-view-profile" style="display:none; text-align:center;">
+                <button class="qm-btn" style="position:absolute; left:15px; top:15px;" onclick="qmShowView('list')">&lt; Back</button>
+                <img id="qm-prof-avatar" src="" style="width:100px; height:100px; border-radius:50%; border:2px solid #00aaff; margin-top:20px; object-fit:cover;">
+                <h2 id="qm-prof-name" style="margin:10px 0;"></h2>
+                <div style="color:#aaa; font-size:12px; margin-bottom:20px;" id="qm-prof-id"></div>
+                <div style="display:flex; justify-content:center; gap:20px; font-size:18px;">
+                    <div><b id="qm-prof-count" style="color:#00ffcc;">0</b><br><span style="font-size:12px;">Quizzes Taken</span></div>
+                    <div><b id="qm-prof-score" style="color:#00ffcc;">0%</b><br><span style="font-size:12px;">Avg Score</span></div>
+                </div>
+                <div style="margin-top:20px; font-size:14px; color:#ffaa00;" id="qm-prof-roles"></div>
+                <h3 style="margin-top:20px; border-bottom: 1px solid #444; padding-bottom:5px;">Created Quizzes</h3>
+                <div id="qm-prof-quizzes" style="text-align:left; max-height:200px; overflow-y:auto; padding:10px; border:1px solid #444; background:rgba(0,0,0,0.5);"></div>
+            </div>
+
+            <div id="qm-view-editor" style="display:none;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                    <button class="qm-btn" onclick="qmShowView('list')">&lt; Cancel</button>
+                    <h3 style="margin:0;">Quiz Editor</h3>
+                    <button class="qm-btn" style="background:#00ff00;" onclick="qmSaveQuiz()">Save Quiz</button>
+                </div>
+                <input type="text" id="qm-edit-title" class="qm-input" placeholder="Quiz Title" style="width:100%; margin-bottom:10px; font-size:18px; font-weight:bold;">
+                <textarea id="qm-edit-desc" class="qm-input" placeholder="Description (Markdown)" style="width:100%; height:60px; margin-bottom:10px;"></textarea>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <select id="qm-edit-diff" class="qm-input">
+                        <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="impossible">Impossible</option>
+                    </select>
+                    <input type="text" id="qm-edit-tags" class="qm-input" placeholder="Tags (comma sep)" style="flex:1;">
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+                    <label><input type="checkbox" id="qm-edit-partial"> Partial Credit</label>
+                    <label><input type="checkbox" id="qm-edit-reqlog"> Require Login</label>
+                    <label><input type="checkbox" id="qm-edit-showcorr"> Show Correct Ans.</label>
+                    <label><input type="checkbox" id="qm-edit-showres"> Show Results</label>
+                </div>
+                <div style="border:1px solid #444; padding:10px; margin-bottom:20px; background:#111;">
+                    <h4 style="margin-top:0; border-bottom:1px solid #444; padding-bottom:5px;">Event Webhooks (Optional)</h4>
+                    <div id="qm-edit-webhooks-container" style="display:flex; flex-direction:column; gap:5px;"></div>
+                </div>
+                <h4 style="border-bottom:1px solid #444; padding-bottom:5px;">Questions</h4>
+                <div id="qm-editor-questions"></div>
+                <div style="display:flex; gap:10px; margin-top:10px; padding-bottom:20px;">
+                    <button class="qm-btn" style="flex:1;" onclick="qmAddEditQuestion()">+ Add Question</button>
+                    <button class="qm-btn" style="flex:1; background:#00ff88;" onclick="qmOpenGenerateDialog()">✨ Generate Draft Quiz</button>
+                </div>
+            </div>
+
+            <div id="qm-generate-dialog" style="display:none; position:absolute; top:5%; left:50%; transform:translateX(-50%); width:600px; max-height:85vh; overflow-y:auto; background:#111; border:2px solid #00ff88; padding:20px; z-index:150; box-shadow:0 0 20px #00ff88;">
+                <h3 style="margin-top:0; color:#00ff88;">Generate Draft Quiz</h3>
+                <label>Quiz Topic:<br><input type="text" id="qm-gen-topic" class="qm-input" style="width:100%; margin-bottom:10px;"></label>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <label style="flex:1;">Question count (3-50):<br><input type="number" id="qm-gen-count" class="qm-input" style="width:100%;" min="3" max="50"></label>
+                    <label style="flex:1;">Difficulty:<br>
+                        <select id="qm-gen-diff" class="qm-input" style="width:100%;">
+                            <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="impossible">Impossible</option>
+                        </select>
+                    </label>
+                </div>
+                <label>Question Type:<br>
+                    <select id="qm-gen-type" class="qm-input" style="width:100%; margin-bottom:10px;">
+                        <option value="mixed">Mixed</option>
+                        <option value="multiple">Multiple Choice</option>
+                        <option value="multi">Select All That Apply</option>
+                        <option value="matching">Matching</option>
+                        <option value="text">Short Answer</option>
+                        <option value="fill">Fill in the Blank</option>
+                        <option value="number">Number</option>
+                        <option value="truefalse">True/False</option>
+                        <option value="file">File Upload</option>
+                    </select>
+                </label>
+                <label>Focus area <span style="color:#aaa;font-size:12px;">(Optional focus)</span>:<br><input type="text" id="qm-gen-focus" class="qm-input" style="width:100%; margin-bottom:10px;"></label>
+                <label>General prompt <span style="color:#aaa;font-size:12px;">(Add broader instructions for the generator (tone, coverage, style, constraints).)</span>:<br>
+                    <textarea id="qm-gen-prompt" class="qm-input" style="width:100%; height:60px; margin-bottom:10px;"></textarea>
+                </label>
+                <label>Question style instruction:<br><input type="text" id="qm-gen-style" class="qm-input" style="width:100%; margin-bottom:10px;"></label>
+                <label>Description instruction:<br><input type="text" id="qm-gen-desc" class="qm-input" style="width:100%; margin-bottom:10px;"></label>
+                <label>Answer instruction:<br><input type="text" id="qm-gen-ans-inst" class="qm-input" style="width:100%; margin-bottom:10px;"></label>
+                
+                <label>"Optimize" questions with Local AI:<br>
+                    <select id="qm-gen-optimize" class="qm-input" style="width:100%; margin-bottom:15px;">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </label>
+
+                <div style="border:1px solid #444; padding:10px; background:#222; margin-bottom:10px;">
+                    <label style="font-weight:bold;">Provider for this request</label>
+                    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Select the API key source to power the AI generation.</div>
+                    <select id="qm-gen-provider" class="qm-input" style="width:100%; margin-bottom:5px;" onchange="qmUpdateProviderKey()">
+                        <option value="quizmaker">Quiz-Maker API Key</option>
+                        <option value="voxel">Voxel World Key</option>
+                    </select>
+                    <input type="password" id="qm-gen-apikey" class="qm-input" style="width:100%;" placeholder="sk-proj-...">
+                </div>
+
+                <div style="font-size:12px; color:#00ffcc; text-align:center; margin-bottom:10px;">Math/equation content is auto-detected from your inputs.</div>
+
+                <div style="display:flex; justify-content:space-between;">
+                    <button class="qm-btn" style="background:#cc0000; color:white;" onclick="document.getElementById('qm-generate-dialog').style.display='none'">Cancel</button>
+                    <button class="qm-btn" style="background:#00ff88;" onclick="qmGenerateQuiz()">Generate</button>
+                </div>
+            </div>
+
+            <div id="qm-review-dialog" style="display:none; position:absolute; top:10%; left:50%; transform:translateX(-50%); width:600px; max-height:85vh; overflow-y:auto; background:#111; border:2px solid #ffaa00; padding:20px; z-index:200; box-shadow:0 0 20px #ffaa00;">
+                <h3 style="margin-top:0; color:#ffaa00;">Review Generated Question <span id="qm-review-progress"></span></h3>
+                <div id="qm-review-ui-container" style="text-align:left; background:rgba(255,255,255,0.05); padding:10px; border-left:3px solid #ffaa00; margin-bottom:15px;"></div>
+                <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                    <button class="qm-btn" style="background:#cc0000;color:white;" onclick="qmReviewDiscard()">Discard</button>
+                    <button class="qm-btn" style="background:#00ff00;" onclick="qmReviewKeep()">Save & Next</button>
+                </div>
+            </div>
+
+            <div id="qm-reset-box" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#111; border:1px solid #55ccff; padding:20px; text-align:center; z-index:150;">
+                <h4 style="margin-top:0;">Reset Password</h4>
+                <input type="text" id="qm-reset-code" class="qm-input" placeholder="Reset Code" style="margin-bottom:10px; width:100%; box-sizing:border-box;"><br>
+                <input type="password" id="qm-reset-newpass" class="qm-input" placeholder="New Password" style="margin-bottom:10px; width:100%; box-sizing:border-box;"><br>
+                <button class="qm-btn" onclick="qmSubmitReset()">Reset</button>
+                <button class="qm-btn" style="background:#cc0000;color:white;" onclick="document.getElementById('qm-reset-box').style.display='none'">Cancel</button>
+            </div>
+
+            <div id="qm-dialog">
+                <div id="qm-dialog-text"></div>
+                <div id="qm-dialog-btns"></div>
+            </div>
+        </div>
+
+        <div id="qm-loading" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); color:#00aaff; justify-content:center; align-items:center; font-size:24px; z-index:9999;">LOADING...</div>
     </div>
 
     <div id="debug-menu">
@@ -1256,7 +1480,8 @@
         }
 
         // --- GAME CONFIG ---
-        const GAME_VERSION = '1.9.2';
+        const GAME_VERSION = '1.9.2.1';
+        const NETWORK_VERSION = '1.9.2';
         const WORLD_SIZE = 40; 
         const BLOCK_SIZE = 5;
         const UNBREAKABLE_BLOCKS = ['bedrock', 'end_frame', 'end_frame_filled', 'portal', 'network_block', '2fa_block', 'wool_chest', 'dark_brick'];
@@ -1437,6 +1662,43 @@
             window.timingCursorPos = 0;
             window.timingDir = 1;
             window.inTimingMinigame = true;
+        };
+
+        window.startCh3Minigame = function() {
+            document.exitPointerLock();
+            document.getElementById('ch3-minigame').style.display = 'block';
+            const canvas = document.getElementById('ch3-canvas');
+            const ctx = canvas.getContext('2d');
+            let pX = 180; let timer = 10.0; let obstacles = []; let lastTime = performance.now();
+            let keys = {a:false, d:false};
+            const kd = (e) => { if(e.code==='KeyA') keys.a=true; if(e.code==='KeyD') keys.d=true; };
+            const ku = (e) => { if(e.code==='KeyA') keys.a=false; if(e.code==='KeyD') keys.d=false; };
+            document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
+            
+            const loop = setInterval(() => {
+                const now = performance.now(); const dt = (now - lastTime)/1000; lastTime = now;
+                timer -= dt;
+                if(keys.a) pX -= 200*dt; if(keys.d) pX += 200*dt;
+                pX = Math.max(0, Math.min(360, pX));
+                if(Math.random() < 0.1) obstacles.push({x: Math.random()*360, y: 0, w: 20+Math.random()*40});
+                
+                ctx.clearRect(0,0,400,400);
+                ctx.fillStyle = 'red'; ctx.fillRect(pX, 360, 40, 40); // Player
+                ctx.fillStyle = 'white';
+                for(let i=obstacles.length-1; i>=0; i--) {
+                    let o = obstacles[i]; o.y += 250*dt; ctx.fillRect(o.x, o.y, o.w, 20);
+                    if(o.y > 340 && o.y < 400 && pX+40 > o.x && pX < o.x+o.w) { timer = 10.0; obstacles=[]; pX=180; break; } // Hit
+                    if(o.y > 400) obstacles.splice(i,1);
+                }
+                ctx.fillStyle = 'lime'; ctx.font = '20px monospace'; ctx.fillText('Time: '+Math.ceil(timer), 10, 30);
+                
+                if(timer <= 0) {
+                    clearInterval(loop); document.removeEventListener('keydown', kd); document.removeEventListener('keyup', ku);
+                    document.getElementById('ch3-minigame').style.display = 'none';
+                    document.body.requestPointerLock();
+                    if (isConnected) ws.send(JSON.stringify({type: 'ch3_win'}));
+                }
+            }, 1000/60);
         };
 
         window.startCh3Minigame = function() {
@@ -4344,6 +4606,8 @@
             
             let hp = 20;
             if (type === 'villager' || type === 'merchant' || type === 'mercator') hp = 5;
+            else if (type === 'zombie') hp = 3;
+            else if (type === 'diddy') health = 4;
             else if (type === 'voidling') hp = 50;
             else if (type === 'void_weaver') hp = 40;
             else if (type === 'void_behemoth') hp = 100;
@@ -4959,12 +5223,15 @@
             }
 
             // Ignore game keybinds if the user is typing in ANY text box
-            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT')) {
                 if (event.code === 'Escape') {
                     event.preventDefault();
                     if (document.activeElement.id === 'chat-input') closeChatInput(true);
                     else if (document.activeElement.id === 'spotify-url') closeSpotifyPanel(true);
                     else if (document.activeElement.id === 'sign-input') document.getElementById('sign-cancel').click();
+                    else if (document.getElementById('qm-review-dialog').style.display === 'block') document.getElementById('qm-review-dialog').style.display = 'none';
+                    else if (document.getElementById('qm-generate-dialog').style.display === 'block') document.getElementById('qm-generate-dialog').style.display = 'none';
+                    else if (document.getElementById('qm-panel').style.display === 'flex') qmClose();
                     else document.activeElement.blur();
                 }
                 if (event.code === 'Enter' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -4992,9 +5259,33 @@
                 return;
             }
 
-            if (event.code === 'Escape' && isChatOpen) {
+            if (event.code === 'Escape') {
+                if (isChatOpen) {
+                    event.preventDefault();
+                    closeChatInput(false);
+                    return;
+                }
+                if (document.getElementById('qm-review-dialog').style.display === 'block') {
+                    event.preventDefault();
+                    document.getElementById('qm-review-dialog').style.display = 'none';
+                    return;
+                }
+                if (document.getElementById('qm-generate-dialog').style.display === 'block') {
+                    event.preventDefault();
+                    document.getElementById('qm-generate-dialog').style.display = 'none';
+                    return;
+                }
+                if (document.getElementById('qm-panel').style.display === 'flex') {
+                    event.preventDefault();
+                    qmClose();
+                    return;
+                }
+            }
+
+            if (event.code === 'KeyQ') {
+                if (event.repeat) return;
                 event.preventDefault();
-                closeChatInput(false);
+                qmToggle();
                 return;
             }
 
@@ -5791,6 +6082,56 @@
             };
             animateFountain();
         }
+        soundManager.playQuizMusic = function() {
+            if (window.useSpotifyOST) {
+                if (this.musicInterval) this.stopMusic();
+                document.getElementById('spotify-url').value = 'https://open.spotify.com/track/2uf1XPmQ0C5GbiPGZqTMQd';
+                loadSpotifyLink();
+                return;
+            }
+            if (!this.ctx) return;
+            if (this.musicInterval) this.stopMusic();
+            this.musicGain = this.ctx.createGain();
+            this.musicGain.gain.value = 0.15;
+            this.musicGain.connect(this.ctx.destination);
+            
+            let step = 0; let nextTime = this.ctx.currentTime + 0.1;
+            // High-energy pentatonic bop
+            const f = { C5: 523.3, D5: 587.3, E5: 659.3, F5: 698.5, G5: 784.0, A5: 880.0, C4: 261.6, G4: 392.0, E4: 329.6, F4: 349.2 };
+            const lead = [f.C5, 0, f.C5, f.E5, f.G5, 0, f.E5, 0, f.A5, 0, f.G5, f.E5, f.C5, f.D5, f.E5, 0];
+            const bass = [f.C4, 0, 0, f.G4, f.C4, 0, 0, f.E4, f.F4, 0, 0, f.C5, f.F4, 0, 0, f.G4];
+
+            this.musicInterval = setInterval(() => {
+                while (nextTime < this.ctx.currentTime + 0.1) {
+                    const beat = step % 16;
+                    
+                    // Lead melody (Bouncy Square)
+                    if (lead[beat]) {
+                        const osc = this.ctx.createOscillator(); osc.type = 'square'; osc.frequency.value = lead[beat];
+                        const env = this.ctx.createGain(); env.gain.setValueAtTime(0, nextTime); env.gain.linearRampToValueAtTime(0.1, nextTime+0.02); env.gain.exponentialRampToValueAtTime(0.01, nextTime + 0.1);
+                        osc.connect(env); env.connect(this.musicGain); osc.start(nextTime); osc.stop(nextTime + 0.15);
+                    }
+                    
+                    // Bassline (Triangle)
+                    if (bass[beat]) {
+                        const osc = this.ctx.createOscillator(); osc.type = 'triangle'; osc.frequency.value = bass[beat] * 0.5;
+                        const env = this.ctx.createGain(); env.gain.setValueAtTime(0, nextTime); env.gain.linearRampToValueAtTime(0.2, nextTime+0.02); env.gain.exponentialRampToValueAtTime(0.01, nextTime + 0.15);
+                        osc.connect(env); env.connect(this.musicGain); osc.start(nextTime); osc.stop(nextTime + 0.15);
+                    }
+                    
+                    // Driving kick & snare rhythm
+                    if (beat % 4 === 0 || beat % 4 === 2) { 
+                        const kick = this.ctx.createOscillator(); kick.frequency.setValueAtTime(150, nextTime); kick.frequency.exponentialRampToValueAtTime(0.01, nextTime + 0.1);
+                        const kEnv = this.ctx.createGain(); kEnv.gain.setValueAtTime(beat % 4 === 0 ? 0.3 : 0.15, nextTime); kEnv.gain.exponentialRampToValueAtTime(0.01, nextTime + 0.1);
+                        kick.connect(kEnv); kEnv.connect(this.musicGain); kick.start(nextTime); kick.stop(nextTime + 0.1);
+                    }
+                    
+                    nextTime += 0.12; // High tempo (125+ bpm)
+                    step++;
+                }
+            }, 50);
+        };
+
         soundManager.playBattleMusic = function() {
             if (window.useSpotifyOST) {
                 if (this.musicInterval) this.stopMusic();
@@ -6381,7 +6722,7 @@
                     updateHealthUI();
                     updateInventoryUI();
 
-                    ws.send(JSON.stringify({ type: 'join', username: user, x: 0, y: 60, z: 0, dim: 'overworld', sessionId: savedSessionId, version: GAME_VERSION }));
+                    ws.send(JSON.stringify({ type: 'join', username: user, x: 0, y: 60, z: 0, dim: 'overworld', sessionId: savedSessionId, version: NETWORK_VERSION }));
                 };
 
                 ws.onmessage = (event) => {
@@ -7585,7 +7926,7 @@
             
             // --- API KEY OVERRIDE ---
             // Set this to your API key string to bypass the prompt and local storage completely.
-            //const OPENAI_API_KEY_OVERRIDE = `sk-proj-... add an OpenAI API key here to not need to enter one in-game!`; 
+            const OPENAI_API_KEY_OVERRIDE = `sk-proj-[key override]`;
 
             let apiKey = OPENAI_API_KEY_OVERRIDE;
             if (!apiKey && window.ANOMALY_API_KEY) apiKey = window.ANOMALY_API_KEY;
@@ -9444,6 +9785,997 @@ Players: ${isConnected ? Array.from(networkEntities.values()).filter(m=>m.type==
             updateDebugInfo(); 
             prevTime = time;
             renderer.render(scene, camera);
+        }
+
+        // --- QUIZ MAKER INTEGRATION ---
+        const QM_API = "https://quiz-maker.bendinghub.net/api";
+        let qmToken = null;
+        let qmUsername = null;
+        let qmUserId = null;
+        let qmRoles = [];
+        let qmQuizzes = [];
+        let qmCurrentQuiz = null;
+        let qmResultId = null;
+        let qmEditState = null;
+        let qmUserSettings = null;
+
+        function qmAlert(msg) {
+            document.getElementById('qm-dialog-text').innerText = msg;
+            document.getElementById('qm-dialog-btns').innerHTML = `<button class="qm-btn" onclick="document.getElementById('qm-dialog').style.display='none'">OK</button>`;
+            document.getElementById('qm-dialog').style.display = 'block';
+        }
+
+        function qmConfirm(msg, onYes, onNo) {
+            document.getElementById('qm-dialog-text').innerText = msg;
+            document.getElementById('qm-dialog-btns').innerHTML = `
+                <button class="qm-btn" id="qm-btn-yes" style="margin-right:10px;">Yes</button>
+                <button class="qm-btn" id="qm-btn-no" style="background:#cc0000;color:white;">No</button>
+            `;
+            document.getElementById('qm-dialog').style.display = 'block';
+            document.getElementById('qm-btn-yes').onclick = () => { document.getElementById('qm-dialog').style.display='none'; if(onYes) onYes(); };
+            document.getElementById('qm-btn-no').onclick = () => { document.getElementById('qm-dialog').style.display='none'; if(onNo) onNo(); };
+        }
+
+        function qmToggle() {
+            const panel = document.getElementById('qm-panel');
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                panel.style.display = 'flex';
+                document.exitPointerLock();
+                qmFetchQuizzes();
+                qmShowView('list');
+            } else {
+                qmClose();
+            }
+        }
+
+        function qmClose() {
+            if (document.getElementById('qm-view-attempt').style.display === 'block') {
+                qmShowView('list'); // Re-routes through our safe music fadeout
+            }
+            document.getElementById('qm-panel').style.display = 'none';
+            if (controls.isLocked === false && document.getElementById('trade-menu').style.display !== 'block' && document.getElementById('inventory-menu').style.display !== 'block' && !isChatOpen && document.getElementById('ch3-minigame').style.display === 'none') {
+                document.body.requestPointerLock();
+            }
+        }
+
+        function qmShowView(view) {
+            const wasAttempt = document.getElementById('qm-view-attempt').style.display === 'block';
+            document.getElementById('qm-view-list').style.display = 'none';
+            document.getElementById('qm-view-detail').style.display = 'none';
+            document.getElementById('qm-view-attempt').style.display = 'none';
+            document.getElementById('qm-view-result').style.display = 'none';
+            document.getElementById('qm-view-profile').style.display = 'none';
+            document.getElementById('qm-view-editor').style.display = 'none';
+            document.getElementById('qm-view-' + view).style.display = 'block';
+
+            if (view === 'attempt') {
+                if (currentDim === 'dark_world' && !window.useSpotifyOST) soundManager.stopMusic();
+                soundManager.playQuizMusic();
+            } else if (wasAttempt) {
+                soundManager.stopMusic();
+                if (currentDim === 'dark_world') {
+                    // Delay slightly so tracks don't fight over the AudioContext
+                    setTimeout(() => {
+                        if (currentDim === 'dark_world' && document.getElementById('qm-view-attempt').style.display !== 'block') {
+                            soundManager.playDarkWorldMusic();
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
+        function qmSetLoading(loading) {
+            document.getElementById('qm-loading').style.display = loading ? 'flex' : 'none';
+        }
+
+        async function qmFetchQuizzes() {
+            qmSetLoading(true);
+            try {
+                const res = await fetch(QM_API + '/quizzes');
+                const allQuizzes = await res.json();
+                qmQuizzes = allQuizzes.filter(q => q.id !== 'mr8art5lukuwqj');
+                qmRenderList();
+            } catch (e) {
+                console.error(e);
+            }
+            qmSetLoading(false);
+        }
+
+        function qmRenderList() {
+            const container = document.getElementById('qm-list-container');
+            container.innerHTML = '';
+            
+            const sTitle = document.getElementById('qm-search-title').value.toLowerCase();
+            const sTags = document.getElementById('qm-search-tags').value.toLowerCase().split(',').map(s=>s.trim()).filter(s=>s);
+            const sDiff = document.getElementById('qm-search-diff').value;
+
+            const filtered = qmQuizzes.filter(q => {
+                if (sTitle && !q.title.toLowerCase().includes(sTitle)) return false;
+                if (sDiff && q.difficulty !== sDiff) return false;
+                if (sTags.length > 0) {
+                    const qTags = (q.tags || []).map(t=>t.toLowerCase());
+                    if (!sTags.some(t => qTags.includes(t))) return false;
+                }
+                return true;
+            });
+
+            filtered.forEach(q => {
+                const el = document.createElement('div');
+                el.className = 'qm-quiz-card';
+                el.innerHTML = `
+                    <div style="font-size:18px; font-weight:bold; color:#00ccff;">${q.title}</div>
+                    <div style="color:#aaa; font-size:12px;">Difficulty: ${q.difficulty || 'unknown'} | Score: ${q.averageScore ? q.averageScore.toFixed(1) : 0}% | Rating: ${q.averageRating ? q.averageRating.toFixed(1) : 'N/A'}</div>
+                    <div class="qm-tags">${(q.tags || []).join(', ')}</div>
+                `;
+                el.onclick = () => qmLoadQuiz(q.id);
+                container.appendChild(el);
+            });
+        }
+
+        async function qmLoadQuiz(id) {
+            qmSetLoading(true);
+            try {
+                const res = await fetch(QM_API + '/quizzes/' + id);
+                qmCurrentQuiz = await res.json();
+                
+                document.getElementById('qm-detail-title').innerText = qmCurrentQuiz.title;
+                document.getElementById('qm-detail-meta').innerText = `Difficulty: ${qmCurrentQuiz.difficulty} | Submissions: ${qmCurrentQuiz.submissions}`;
+                document.getElementById('qm-detail-desc').innerHTML = marked.parse(qmCurrentQuiz.description || '');
+                
+                if (qmCurrentQuiz.seoPath) {
+                    document.getElementById('qm-web-link').href = `https://quiz-maker.bendinghub.net${qmCurrentQuiz.seoPath}`;
+                    document.getElementById('qm-web-link').style.display = 'inline';
+                } else {
+                    document.getElementById('qm-web-link').style.display = 'none';
+                }
+
+                const btnEdit = document.getElementById('qm-btn-edit');
+                if (qmToken && (qmUserId === qmCurrentQuiz.owner || qmRoles.includes('moderator'))) {
+                    btnEdit.style.display = 'inline-block';
+                } else {
+                    btnEdit.style.display = 'none';
+                }
+
+                qmShowView('detail');
+            } catch (e) {
+                console.error(e);
+                qmAlert("Failed to load quiz.");
+            }
+            qmSetLoading(false);
+        }
+
+        async function qmViewProfile(userId) {
+            if (!userId) return;
+            qmSetLoading(true);
+            try {
+                const uRes = await fetch(QM_API + '/users');
+                const users = await uRes.json();
+                const uInfo = users.find(u => u.id === userId) || { username: 'Unknown', avatar: '' };
+                
+                const pRes = await fetch(QM_API + '/users/' + userId + '/profile');
+                if (!pRes.ok) throw new Error("Profile fetch failed");
+                const pData = await pRes.json();
+                
+                document.getElementById('qm-prof-avatar').src = uInfo.avatar ? `https://quiz-maker.bendinghub.net${uInfo.avatar}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+                document.getElementById('qm-prof-name').innerText = uInfo.username;
+                document.getElementById('qm-prof-id').innerText = userId;
+                document.getElementById('qm-prof-count').innerText = pData.quizCount || 0;
+                document.getElementById('qm-prof-score').innerText = (pData.averageScore ? pData.averageScore.toFixed(1) : 0) + '%';
+                document.getElementById('qm-prof-roles').innerText = (pData.roles || []).join(' | ').toUpperCase();
+                
+                const qRes = await fetch(QM_API + '/quizzes');
+                const allQs = await qRes.json();
+                const userQs = allQs.filter(q => q.owner === userId && q.id !== 'mr8art5lukuwqj');
+                let qHtml = '';
+                if (userQs.length === 0) {
+                    qHtml = '<div style="color:#aaa; text-align:center;">No quizzes found.</div>';
+                } else {
+                    userQs.forEach(q => {
+                        qHtml += `<div class="qm-quiz-card" onclick="qmLoadQuiz('${q.id}')">
+                            <div style="font-size:16px; font-weight:bold; color:#00ccff;">${q.title}</div>
+                        </div>`;
+                    });
+                }
+                document.getElementById('qm-prof-quizzes').innerHTML = qHtml;
+
+                qmShowView('profile');
+            } catch(e) {
+                qmAlert("Failed to load profile.");
+            }
+            qmSetLoading(false);
+        }
+
+        function qmStartQuiz() {
+            if (qmCurrentQuiz.requireLogin && !qmToken) {
+                qmAlert("You must log in to take this quiz.");
+                return;
+            }
+            qmResultId = null;
+            
+            document.getElementById('qm-attempt-title').innerText = qmCurrentQuiz.title;
+            const qContainer = document.getElementById('qm-attempt-questions');
+            qContainer.innerHTML = '';
+            
+            qmCurrentQuiz.questions.forEach((q, i) => {
+                let html = `<div class="qm-question"><h4>${i+1}. ${q.text}</h4>`;
+                if (q.description) html += `<div class="qm-desc" style="margin-bottom:10px;">${marked.parse(q.description)}</div>`;
+                
+                if (q.type === 'multiple') {
+                    q.options.forEach((opt, oi) => {
+                        html += `<label style="display:block; margin:4px 0;"><input type="radio" name="qm-q-${i}" value="${oi}"> ${opt}</label>`;
+                    });
+                } else if (q.type === 'multi') {
+                    q.options.forEach((opt, oi) => {
+                        html += `<label style="display:block; margin:4px 0;"><input type="checkbox" name="qm-q-${i}" value="${oi}"> ${opt}</label>`;
+                    });
+                } else if (q.type === 'matching') {
+                    q.leftItems.forEach((left, li) => {
+                        html += `<div style="margin:4px 0;">${left} &rarr; <select id="qm-q-${i}-${li}" class="qm-input">
+                            <option value="">--Select--</option>
+                            ${q.rightOptions.map(ro => `<option value="${ro}">${ro}</option>`).join('')}
+                        </select></div>`;
+                    });
+                } else if (q.type === 'text') {
+                    html += `<input type="text" id="qm-q-${i}" class="qm-input" style="width:100%">`;
+                } else if (q.type === 'fill') {
+                    let txt = q.text || '';
+                    let bi = q.blankIndex !== undefined ? q.blankIndex : txt.length;
+                    let p1 = txt.substring(0, bi);
+                    let p2 = txt.substring(bi);
+                    html += `<div style="margin:4px 0;">${p1} <input type="text" id="qm-q-${i}" class="qm-input"> ${p2}</div>`;
+                } else if (q.type === 'number') {
+                    html += `<input type="number" id="qm-q-${i}" class="qm-input">`;
+                } else if (q.type === 'truefalse') {
+                    html += `<label style="display:block;"><input type="radio" name="qm-q-${i}" value="true"> True</label>`;
+                    html += `<label style="display:block;"><input type="radio" name="qm-q-${i}" value="false"> False</label>`;
+                } else if (q.type === 'file') {
+                    html += `<input type="file" id="qm-q-${i}" class="qm-input">`;
+                }
+                html += `</div>`;
+                qContainer.insertAdjacentHTML('beforeend', html);
+            });
+            
+            qmShowView('attempt');
+        }
+
+        async function qmGetAnswer(q, i) {
+            if (q.type === 'multiple') {
+                const c = document.querySelector(`input[name="qm-q-${i}"]:checked`);
+                return c ? parseInt(c.value) : -1;
+            } else if (q.type === 'multi') {
+                const cs = document.querySelectorAll(`input[name="qm-q-${i}"]:checked`);
+                return Array.from(cs).map(c => parseInt(c.value));
+            } else if (q.type === 'matching') {
+                return q.leftItems.map((_, li) => document.getElementById(`qm-q-${i}-${li}`).value);
+            } else if (q.type === 'text' || q.type === 'fill') {
+                return document.getElementById(`qm-q-${i}`).value;
+            } else if (q.type === 'number') {
+                const v = document.getElementById(`qm-q-${i}`).value;
+                return v === '' ? null : parseFloat(v);
+            } else if (q.type === 'truefalse') {
+                const c = document.querySelector(`input[name="qm-q-${i}"]:checked`);
+                return c ? c.value === 'true' : null;
+            } else if (q.type === 'file') {
+                const fInput = document.getElementById(`qm-q-${i}`);
+                if (fInput.files.length > 0) {
+                    return new Promise(res => {
+                        const reader = new FileReader();
+                        reader.onload = e => res(e.target.result);
+                        reader.readAsDataURL(fInput.files[0]);
+                    });
+                }
+                return "";
+            }
+        }
+
+        async function qmSubmitQuiz() {
+            qmSetLoading(true);
+            try {
+                const answers = [];
+                for (let i = 0; i < qmCurrentQuiz.questions.length; i++) {
+                    answers.push(await qmGetAnswer(qmCurrentQuiz.questions[i], i));
+                }
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (qmToken) headers['Authorization'] = 'Bearer ' + qmToken;
+
+                const res = await fetch(QM_API + '/quizzes/' + qmCurrentQuiz.id + '/submit', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ answers })
+                });
+
+                if (!res.ok) throw new Error("Submission failed");
+                const data = await res.json();
+                
+                qmResultId = data.resultId;
+                
+                document.getElementById('qm-result-score').innerText = `${data.score.toFixed(1)}%`;
+                document.getElementById('qm-result-details').innerText = `${data.correct} / ${data.total} correct`;
+                
+                const rateBox = document.getElementById('qm-rate-box');
+                if (qmToken && qmResultId) {
+                    rateBox.style.display = 'block';
+                    document.getElementById('qm-rate-score').value = 5;
+                    document.getElementById('qm-rate-review').value = '';
+                } else {
+                    rateBox.style.display = 'none';
+                }
+
+                qmShowView('result');
+            } catch (e) {
+                console.error(e);
+                qmAlert("Failed to submit quiz.");
+            }
+            qmSetLoading(false);
+        }
+
+        async function qmSubmitRating() {
+            if (!qmToken || !qmResultId) return;
+            const rating = parseInt(document.getElementById('qm-rate-score').value);
+            const review = document.getElementById('qm-rate-review').value;
+
+            qmSetLoading(true);
+            try {
+                const res = await fetch(QM_API + '/quizzes/' + qmCurrentQuiz.id + '/rate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + qmToken },
+                    body: JSON.stringify({ resultId: qmResultId, rating, review: review || undefined })
+                });
+                if (!res.ok) throw new Error("Rating failed");
+                qmAlert("Rating submitted!");
+                document.getElementById('qm-rate-box').style.display = 'none';
+            } catch (e) {
+                console.error(e);
+                qmAlert("Failed to submit rating.");
+            }
+            qmSetLoading(false);
+        }
+
+        async function qmLogInOut() {
+            if (qmToken) {
+                qmToken = null; qmUsername = null; qmUserId = null; qmRoles = [];
+                document.getElementById('qm-auth-status').innerText = 'Not logged in';
+                document.getElementById('qm-btn-auth').innerText = 'Login';
+                document.getElementById('qm-user').style.display = 'inline-block';
+                document.getElementById('qm-pass').style.display = 'inline-block';
+                document.getElementById('qm-btn-fpass').style.display = 'inline-block';
+                document.getElementById('qm-btn-prof').style.display = 'none';
+                document.getElementById('qm-btn-create').style.display = 'none';
+            } else {
+                const user = document.getElementById('qm-user').value;
+                const pass = document.getElementById('qm-pass').value;
+                if (!user || !pass) { qmAlert("Enter username and password"); return; }
+                
+                qmSetLoading(true);
+                try {
+                    const res = await fetch(QM_API + '/users/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: user, password: pass })
+                    });
+                    if (!res.ok) throw new Error("Login failed");
+                    const data = await res.json();
+                    qmToken = data.token;
+                    qmUsername = data.username;
+                    qmUserId = data.id;
+                    
+                    document.getElementById('qm-auth-status').innerText = 'Logged in as ' + qmUsername;
+                    document.getElementById('qm-btn-auth').innerText = 'Logout';
+                    document.getElementById('qm-user').style.display = 'none';
+                    document.getElementById('qm-pass').style.display = 'none';
+                    document.getElementById('qm-btn-fpass').style.display = 'none';
+                    document.getElementById('qm-btn-prof').style.display = 'inline-block';
+                    document.getElementById('qm-btn-create').style.display = 'inline-block';
+                    document.getElementById('qm-user').value = '';
+                    document.getElementById('qm-pass').value = '';
+                    
+                    try {
+                        const pRes = await fetch(QM_API + '/users/' + qmUserId + '/profile');
+                        const pData = await pRes.json();
+                        qmRoles = pData.roles || [];
+                    } catch(err) { qmRoles = []; }
+                } catch (e) {
+                    qmAlert("Login failed.");
+                }
+                qmSetLoading(false);
+            }
+        }
+
+        async function qmForgotPassword() {
+            const user = document.getElementById('qm-user').value;
+            if (!user) {
+                qmAlert("Please enter a username in the login field first.");
+                return;
+            }
+            
+            qmConfirm("Would you like to use Discord OAuth flow? (Opens new tab)\n\nSelecting 'No' will send a reset code to your Discord DMs immediately without a redirect.", async () => {
+                try {
+                    const res = await fetch(QM_API + '/users/forgot-password/oauth/start?username=' + encodeURIComponent(user));
+                    const data = await res.json();
+                    if (data.url) window.open(data.url, '_blank');
+                } catch (e) {
+                    qmAlert("Failed to start OAuth flow.");
+                }
+            }, async () => {
+                qmSetLoading(true);
+                try {
+                    const res = await fetch(QM_API + '/users/forgot-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: user })
+                    });
+                    const data = await res.json();
+                    qmAlert(data.message || "Reset code requested.");
+                    document.getElementById('qm-reset-box').style.display = 'block';
+                } catch (e) {
+                    qmAlert("Failed to request reset code.");
+                }
+                qmSetLoading(false);
+            });
+        }
+
+        async function qmSubmitReset() {
+            const user = document.getElementById('qm-user').value;
+            const code = document.getElementById('qm-reset-code').value;
+            const newPass = document.getElementById('qm-reset-newpass').value;
+            if (!user || !code || !newPass) {
+                qmAlert("Please fill out all fields.");
+                return;
+            }
+            qmSetLoading(true);
+            try {
+                const res = await fetch(QM_API + '/users/forgot-password/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, code: code, newPassword: newPass })
+                });
+                if (!res.ok) throw new Error("Reset failed");
+                qmAlert("Password reset successfully!");
+                document.getElementById('qm-reset-box').style.display = 'none';
+                document.getElementById('qm-reset-code').value = '';
+                document.getElementById('qm-reset-newpass').value = '';
+            } catch (e) {
+                qmAlert("Failed to complete password reset.");
+            }
+            qmSetLoading(false);
+        }
+
+        // --- QUIZ EDITOR LOGIC ---
+        function qmCreateQuiz() {
+            qmEditState = {
+                id: null, title: "", description: "", difficulty: "medium", tags: [],
+                partialCreditEnabled: true, requireLogin: false, showCorrectAnswersForIncorrect: true, showQuestionResults: true,
+                webhooks: null, questions: []
+            };
+            qmSyncEditorForm();
+            qmShowView('editor');
+        }
+
+        async function qmLoadEditor(id) {
+            qmSetLoading(true);
+            try {
+                const res = await fetch(QM_API + '/quizzes/' + id + '/edit', {
+                    headers: { 'Authorization': 'Bearer ' + qmToken }
+                });
+                if (!res.ok) throw new Error("Failed to load editor");
+                qmEditState = await res.json();
+                qmSyncEditorForm();
+                qmShowView('editor');
+            } catch(e) {
+                qmAlert("Failed to load quiz for editing.");
+            }
+            qmSetLoading(false);
+        }
+
+        window.qmChangeQuestionType = function(i, type) {
+            const q = qmEditState.questions[i];
+            q.type = type;
+            if (type === 'multiple') { q.options = q.options || []; q.correct = typeof q.correct === 'number' ? q.correct : 0; }
+            else if (type === 'multi') { q.options = q.options || []; q.correct = Array.isArray(q.correct) ? q.correct : []; }
+            else if (type === 'matching') { q.pairs = q.pairs || []; }
+            else { q.answer = Array.isArray(q.answer) ? q.answer : []; }
+            qmRenderEditorQuestions();
+        };
+
+        window.qmAddOption = function(qIndex) { qmEditState.questions[qIndex].options.push(''); qmRenderEditorQuestions(); };
+        window.qmRemoveOption = function(qIndex, oIndex) { 
+            const q = qmEditState.questions[qIndex];
+            q.options.splice(oIndex, 1);
+            if (q.type === 'multiple') {
+                if (q.correct === oIndex) q.correct = 0;
+                else if (q.correct > oIndex) q.correct--;
+            } else if (q.type === 'multi') {
+                q.correct = q.correct.filter(c => c !== oIndex).map(c => c > oIndex ? c - 1 : c);
+            }
+            qmRenderEditorQuestions(); 
+        };
+        window.qmUpdateCorrectOpt = function(qIndex, oIndex, isChecked, type) {
+            const q = qmEditState.questions[qIndex];
+            if (type === 'multiple') { q.correct = oIndex; }
+            else if (type === 'multi') {
+                if (isChecked && !q.correct.includes(oIndex)) q.correct.push(oIndex);
+                if (!isChecked) q.correct = q.correct.filter(c => c !== oIndex);
+            }
+            qmRenderEditorQuestions();
+        };
+
+        window.qmAddPair = function(qIndex) { qmEditState.questions[qIndex].pairs.push({left:'', right:''}); qmRenderEditorQuestions(); };
+        window.qmRemovePair = function(qIndex, pIndex) { qmEditState.questions[qIndex].pairs.splice(pIndex, 1); qmRenderEditorQuestions(); };
+
+        window.qmAddAnswer = function(qIndex, type) { qmEditState.questions[qIndex].answer.push(type==='number'?0:''); qmRenderEditorQuestions(); };
+        window.qmRemoveAnswer = function(qIndex, aIndex) { qmEditState.questions[qIndex].answer.splice(aIndex, 1); qmRenderEditorQuestions(); };
+
+        function qmSyncEditorForm() {
+            document.getElementById('qm-edit-title').value = qmEditState.title || '';
+            document.getElementById('qm-edit-desc').value = qmEditState.description || '';
+            document.getElementById('qm-edit-diff').value = qmEditState.difficulty || 'medium';
+            document.getElementById('qm-edit-tags').value = (qmEditState.tags || []).join(', ');
+            document.getElementById('qm-edit-partial').checked = !!qmEditState.partialCreditEnabled;
+            document.getElementById('qm-edit-reqlog').checked = !!qmEditState.requireLogin;
+            document.getElementById('qm-edit-showcorr').checked = !!qmEditState.showCorrectAnswersForIncorrect;
+            document.getElementById('qm-edit-showres').checked = !!qmEditState.showQuestionResults;
+            
+            const wh = qmEditState.webhooks || { events: {}, eventUrls: {} };
+            const events = ['quiz_created', 'quiz_updated', 'quiz_deleted', 'quiz_submission', 'quiz_rating'];
+            let whHtml = '';
+            events.forEach(ev => {
+                const checked = wh.events && wh.events[ev] ? 'checked' : '';
+                const url = (wh.eventUrls && wh.eventUrls[ev]) ? wh.eventUrls[ev] : '';
+                whHtml += `
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <label style="width:160px; font-size:12px;"><input type="checkbox" id="qm-wh-cb-${ev}" ${checked}> ${ev}</label>
+                        <input type="text" id="qm-wh-url-${ev}" class="qm-input" style="flex:1; padding:2px;" placeholder="Webhook URL" value="${url}">
+                    </div>
+                `;
+            });
+            document.getElementById('qm-edit-webhooks-container').innerHTML = whHtml;
+            
+            qmRenderEditorQuestions();
+        }
+
+        window.qmAddEditQuestion = function() {
+            qmEditState.questions.push({ type: 'text', text: '', description: '', answer: [] });
+            qmRenderEditorQuestions();
+        }
+
+        window.qmRenderEditorQuestions = function() {
+            const container = document.getElementById('qm-editor-questions');
+            container.innerHTML = '';
+            qmEditState.questions.forEach((q, i) => {
+                const qTypeHtml = `
+                    <select class="qm-input" onchange="qmChangeQuestionType(${i}, this.value)">
+                        <option value="multiple" ${q.type==='multiple'?'selected':''}>Multiple Choice</option>
+                        <option value="multi" ${q.type==='multi'?'selected':''}>Select All That Apply</option>
+                        <option value="matching" ${q.type==='matching'?'selected':''}>Matching</option>
+                        <option value="text" ${q.type==='text'?'selected':''}>Short Answer</option>
+                        <option value="fill" ${q.type==='fill'?'selected':''}>Fill in the Blank</option>
+                        <option value="number" ${q.type==='number'?'selected':''}>Number</option>
+                        <option value="truefalse" ${q.type==='truefalse'?'selected':''}>True/False</option>
+                        <option value="file" ${q.type==='file'?'selected':''}>File Upload Criteria</option>
+                    </select>
+                `;
+                
+                let specificHtml = '';
+                
+                if (q.type === 'multiple' || q.type === 'multi') {
+                    const opts = q.options || [];
+                    const inputType = q.type === 'multiple' ? 'radio' : 'checkbox';
+                    const correctArr = Array.isArray(q.correct) ? q.correct : [q.correct || 0];
+                    let optsHtml = '';
+                    opts.forEach((opt, oi) => {
+                        const isChecked = correctArr.includes(oi);
+                        optsHtml += `
+                            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                <input type="${inputType}" name="qm-edit-opt-${i}" ${isChecked ? 'checked' : ''} onchange="qmUpdateCorrectOpt(${i}, ${oi}, this.checked, '${q.type}')">
+                                <input type="text" class="qm-input" style="flex:1;" placeholder="Option text" value="${opt.replace(/"/g, '&quot;')}" oninput="qmEditState.questions[${i}].options[${oi}] = this.value">
+                                <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmRemoveOption(${i}, ${oi})">X</button>
+                            </div>
+                        `;
+                    });
+                    specificHtml = `
+                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Select the radio/checkbox to mark correct answer(s).</div>
+                        ${optsHtml}
+                        <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmAddOption(${i})">+ Add Option</button>
+                    `;
+                } 
+                else if (q.type === 'matching') {
+                    const pairs = q.pairs || [];
+                    let pairsHtml = '';
+                    pairs.forEach((p, pi) => {
+                        pairsHtml += `
+                            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                <input type="text" class="qm-input" style="flex:1;" placeholder="Left side" value="${(p.left||'').replace(/"/g, '&quot;')}" oninput="qmEditState.questions[${i}].pairs[${pi}].left = this.value">
+                                <input type="text" class="qm-input" style="flex:1;" placeholder="Right match" value="${(p.right||'').replace(/"/g, '&quot;')}" oninput="qmEditState.questions[${i}].pairs[${pi}].right = this.value">
+                                <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmRemovePair(${i}, ${pi})">X</button>
+                            </div>
+                        `;
+                    });
+                    specificHtml = `
+                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Matching Pairs (Left matches to Right)</div>
+                        ${pairsHtml}
+                        <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmAddPair(${i})">+ Add Pair</button>
+                    `;
+                } 
+                else if (q.type === 'truefalse') {
+                    specificHtml = `
+                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Correct Answer</div>
+                        <select class="qm-input" onchange="qmEditState.questions[${i}].correct = (this.value === 'true')">
+                            <option value="true" ${q.correct?'selected':''}>True</option>
+                            <option value="false" ${!q.correct?'selected':''}>False</option>
+                        </select>
+                    `;
+                } 
+                else {
+                    // Text, Fill, Number, File all use an array of acceptable answers
+                    const ansArr = Array.isArray(q.answer) ? q.answer : (q.answer !== undefined && q.answer !== '' ? [q.answer] : []);
+                    const isNum = q.type === 'number';
+                    let ansHtml = '';
+                    ansArr.forEach((a, ai) => {
+                        ansHtml += `
+                            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                <input type="${isNum ? 'number' : 'text'}" class="qm-input" style="flex:1;" placeholder="Accepted Answer" value="${typeof a === 'string' ? a.replace(/"/g, '&quot;') : a}" oninput="qmEditState.questions[${i}].answer[${ai}] = ${isNum ? 'parseFloat(this.value)||0' : 'this.value'}">
+                                <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmRemoveAnswer(${i}, ${ai})">X</button>
+                            </div>
+                        `;
+                    });
+                    
+                    specificHtml = `
+                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Valid / Accepted Answers</div>
+                        ${ansHtml}
+                        <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmAddAnswer(${i}, '${q.type}')">+ Add Accepted Answer</button>
+                    `;
+
+                    if (q.type === 'fill') {
+                        const txt = q.text || '';
+                        const bi = q.blankIndex !== undefined ? q.blankIndex : txt.length;
+                        const preview = txt.substring(0, bi) + " [___] " + txt.substring(bi);
+                        specificHtml = `
+                            <div style="color:#00ffcc; margin-top:5px; margin-bottom:5px; font-size:14px; font-weight:bold;">Preview: ${preview.replace(/</g, '&lt;')}</div>
+                            <button class="qm-btn" style="background:#ffaa00; margin-bottom:10px;" onclick="const el=document.getElementById('qm-editor-qtext-${i}'); qmEditState.questions[${i}].blankIndex=el.selectionStart; qmRenderEditorQuestions()">Set Blank Position to Cursor in Text Box</button>
+                            ` + specificHtml;
+                    }
+                }
+
+                const html = `
+                    <div class="qm-question" style="position:relative;">
+                        <button class="qm-btn" style="position:absolute; right:10px; top:10px; background:#cc0000; color:white; padding:2px 8px;" onclick="qmEditState.questions.splice(${i},1); qmRenderEditorQuestions()">X</button>
+                        ${qTypeHtml}<br><br>
+                        <input type="text" id="qm-editor-qtext-${i}" class="qm-input" style="width:100%; margin-bottom:5px;" placeholder="Question Text" value="${(q.text||'').replace(/"/g, '&quot;')}" oninput="qmEditState.questions[${i}].text = this.value">
+                        <textarea class="qm-input" style="width:100%; height:40px; margin-bottom:5px;" placeholder="Description (Markdown)" oninput="qmEditState.questions[${i}].description = this.value">${(q.description||'').replace(/</g, '&lt;')}</textarea>
+                        ${specificHtml}
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        window.qmOpenGenerateDialog = async function() {
+            qmSetLoading(true);
+            qmUserSettings = { reviewGeneratedQuestions: true, defaultDifficulty: 'medium', defaultQuestionCount: 8, openaiApiKey: '' }; // Fallback defaults
+            
+            if (qmToken) {
+                try {
+                    const res = await fetch(QM_API + '/users/' + qmUserId + '/settings', { headers: { 'Authorization': 'Bearer ' + qmToken } });
+                    if (res.ok) {
+                        const data = await res.json();
+                        qmUserSettings = { ...qmUserSettings, ...data };
+                    }
+                } catch(e) {}
+            }
+
+            document.getElementById('qm-gen-topic').value = '';
+            document.getElementById('qm-gen-count').value = qmUserSettings.defaultQuestionCount || 8;
+            document.getElementById('qm-gen-type').value = 'mixed';
+            document.getElementById('qm-gen-diff').value = qmUserSettings.defaultDifficulty || 'medium';
+            document.getElementById('qm-gen-focus').value = '';
+            document.getElementById('qm-gen-prompt').value = '';
+            document.getElementById('qm-gen-style').value = '';
+            document.getElementById('qm-gen-desc').value = '';
+            document.getElementById('qm-gen-ans-inst').value = '';
+            document.getElementById('qm-gen-optimize').value = 'no';
+
+            const provSel = document.getElementById('qm-gen-provider');
+            if (qmToken && qmUserSettings.openaiApiKey) {
+                provSel.options[0].disabled = false;
+                provSel.value = 'quizmaker';
+            } else {
+                provSel.options[0].disabled = true;
+                provSel.value = 'voxel';
+            }
+            qmUpdateProviderKey();
+
+            document.getElementById('qm-generate-dialog').style.display = 'block';
+            qmSetLoading(false);
+        };
+
+        window.qmUpdateProviderKey = function() {
+            const prov = document.getElementById('qm-gen-provider').value;
+            const keyInput = document.getElementById('qm-gen-apikey');
+            if (prov === 'quizmaker') {
+                keyInput.value = (qmUserSettings && qmUserSettings.openaiApiKey) ? qmUserSettings.openaiApiKey : '';
+            } else {
+                keyInput.value = window.ANOMALY_API_KEY || localStorage.getItem('openai_api_key') || '';
+            }
+        };
+
+        window.qmGenerateQuiz = async function() {
+            const topic = document.getElementById('qm-gen-topic').value.trim();
+            const count = parseInt(document.getElementById('qm-gen-count').value) || 8;
+            const type = document.getElementById('qm-gen-type').value;
+            const diff = document.getElementById('qm-gen-diff').value;
+            const focus = document.getElementById('qm-gen-focus').value.trim();
+            const promptText = document.getElementById('qm-gen-prompt').value.trim();
+            const ansInst = document.getElementById('qm-gen-ans-inst').value.trim();
+            const optimize = document.getElementById('qm-gen-optimize').value;
+            const apiKey = document.getElementById('qm-gen-apikey').value.trim();
+            const prov = document.getElementById('qm-gen-provider').value;
+
+            if (!apiKey) { qmAlert("API key required."); return; }
+
+            if (prov === 'voxel') {
+                const existingKey = window.ANOMALY_API_KEY || localStorage.getItem('openai_api_key');
+                if (apiKey !== existingKey) {
+                    localStorage.setItem('openai_api_key', apiKey);
+                    window.ANOMALY_API_KEY = apiKey;
+                }
+            }
+
+            const includeMath = (function() {
+                if (type === 'number') return 'yes';
+                if (!topic && !focus) return 'no';
+                const combined = topic + " " + focus;
+                if (/\b(math|mathematics|algebra|geometry|trigonometry|calculus|arithmetic|equation|equations|solve|formula|formulas|physics|chemistry|statistics|probability|percent|percentage|ratio|fraction|integer|decimal)\b/i.test(combined)) return 'yes';
+                if (/(?:\d\s*[+\-*/×÷=])|(?:[+\-*/×÷=]\s*\d)/.test(combined)) return 'yes';
+                if (/\d/.test(combined) && /[+\-*×/÷]/.test(combined)) return 'yes';
+                return 'no';
+            })();
+
+            const summaryArr = [];
+            if (topic) summaryArr.push(topic);
+            if (focus) summaryArr.push(focus);
+            const summary = promptText || summaryArr.join(' — ') || topic || 'General Knowledge';
+
+            const sysPrompt = `You generate educational quizzes and must output ONLY valid JSON with shape: {"title":string,"description":string,"questions":[{"type":"multiple|multi|matching|text|number|file|truefalse|fill","text":string,"description":string,"options"?:string[],"correct"?:number|number[]|boolean,"answer"?:string|string[]|number|number[],"pairs"?:[{"left":string,"right":string}],"blankIndex"?:number}]}. For multiple/multi include at least 4 options. For matching include at least 3 pairs. For text, number, and file, include at least one answer. File questions have an upload limit of 4kb (any text file). File question answers should be a description of criteria the file should meet, where the question is correct if it meets any of them. For truefalse, correct must be a boolean. For fill, include an answer array and an optional blankIndex integer indicating where the blank belongs in the text. No markdown fences. Prioritize factual correctness over creativity. Never fabricate specific lore/trivia when uncertain; instead produce conceptual or mechanics-focused questions that remain correct. Verify each correct index maps to the intended option text before returning JSON.`;
+
+            const usrPrompt = `Create a quiz as strict JSON only.\nTopic: ${topic}\nQuestion count: ${count}\nRequested type(s): ${type}\nDifficulty: ${diff}\nFocus: ${focus || 'none'}\\nInclude math/equations: ${includeMath}\nPrompt summary: ${summary}\nDomain guidance: Stay within the user topic and focus. If uncertain about niche facts, prefer conceptual/practical questions rather than specific trivia.\nCorrectness rules: (1) Every question must have factually consistent answer key. (2) For multiple, correct must point to exactly one true option. (3) For multi, correct must include all and only true options. (4) Do not output placeholder answers like "topic basics". (5) Ensure options are semantically distinct and not contradictory.`;
+
+            qmSetLoading(true);
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        response_format: { type: "json_object" },
+                        messages: [
+                            { role: 'system', content: sysPrompt },
+                            { role: 'user', content: usrPrompt }
+                        ]
+                    })
+                });
+
+                if (!res.ok) throw new Error("OpenAI API request failed.");
+                const data = await res.json();
+                let content = data.choices[0].message.content.trim();
+                const parsed = JSON.parse(content);
+                const generatedQs = parsed.questions || [];
+
+                if (optimize === 'yes') {
+                    generatedQs.forEach(q => {
+                        if (q.type === 'text') {
+                            const baseTopic = topic.split(' ')[0] || promptText.split(' ')[0] || 'Topic';
+                            const baseTopic2 = topic.split(' ')[0] || promptText.split(' ')[1] || 'Topic';
+                            const hardcoded = [`${baseTopic} in the ${baseTopic2}`, `${baseTopic} basics`, `${baseTopic} application`];
+                            if (ansInst) hardcoded.push(ansInst);
+                            q.answer = Array.isArray(q.answer) ? q.answer.concat(hardcoded) : [q.answer].concat(hardcoded);
+                        }
+                    });
+                }
+
+                window.qmReviewQueue = generatedQs;
+                window.qmReviewIndex = 0;
+
+                if (qmUserSettings && qmUserSettings.reviewGeneratedQuestions === false) {
+                    qmEditState.questions.push(...qmReviewQueue);
+                    qmRenderEditorQuestions();
+                    document.getElementById('qm-generate-dialog').style.display = 'none';
+                } else {
+                    document.getElementById('qm-generate-dialog').style.display = 'none';
+                    qmShowReviewDialog();
+                }
+            } catch(e) {
+                qmAlert("Failed to generate quiz: " + e.message);
+            }
+            qmSetLoading(false);
+        };
+
+        window.qmRenderReviewUI = function() {
+            const q = qmReviewQueue[qmReviewIndex];
+            const container = document.getElementById('qm-review-ui-container');
+            
+            const qTypeHtml = `
+                <select class="qm-input" onchange="qmReviewQueue[${qmReviewIndex}].type=this.value; if(this.value==='multiple'){qmReviewQueue[${qmReviewIndex}].options=qmReviewQueue[${qmReviewIndex}].options||[]; qmReviewQueue[${qmReviewIndex}].correct=0;} else if(this.value==='multi'){qmReviewQueue[${qmReviewIndex}].options=qmReviewQueue[${qmReviewIndex}].options||[]; qmReviewQueue[${qmReviewIndex}].correct=[];} else if(this.value==='matching'){qmReviewQueue[${qmReviewIndex}].pairs=qmReviewQueue[${qmReviewIndex}].pairs||[];} else {qmReviewQueue[${qmReviewIndex}].answer=Array.isArray(qmReviewQueue[${qmReviewIndex}].answer)?qmReviewQueue[${qmReviewIndex}].answer:[];} qmRenderReviewUI()">
+                    <option value="multiple" ${q.type==='multiple'?'selected':''}>Multiple Choice</option>
+                    <option value="multi" ${q.type==='multi'?'selected':''}>Select All That Apply</option>
+                    <option value="matching" ${q.type==='matching'?'selected':''}>Matching</option>
+                    <option value="text" ${q.type==='text'?'selected':''}>Short Answer</option>
+                    <option value="fill" ${q.type==='fill'?'selected':''}>Fill in the Blank</option>
+                    <option value="number" ${q.type==='number'?'selected':''}>Number</option>
+                    <option value="truefalse" ${q.type==='truefalse'?'selected':''}>True/False</option>
+                    <option value="file" ${q.type==='file'?'selected':''}>File Upload Criteria</option>
+                </select>
+            `;
+            
+            let specificHtml = '';
+            if (q.type === 'multiple' || q.type === 'multi') {
+                const opts = q.options || [];
+                const inputType = q.type === 'multiple' ? 'radio' : 'checkbox';
+                const correctArr = Array.isArray(q.correct) ? q.correct : [q.correct || 0];
+                let optsHtml = '';
+                opts.forEach((opt, oi) => {
+                    const isChecked = correctArr.includes(oi);
+                    optsHtml += `
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <input type="${inputType}" name="qm-rev-opt" ${isChecked ? 'checked' : ''} onchange="
+                                if('${q.type}' === 'multiple') { qmReviewQueue[${qmReviewIndex}].correct = ${oi}; }
+                                else {
+                                    let arr = qmReviewQueue[${qmReviewIndex}].correct;
+                                    if(!Array.isArray(arr)) arr = [];
+                                    if(this.checked && !arr.includes(${oi})) arr.push(${oi});
+                                    if(!this.checked) arr = arr.filter(c => c !== ${oi});
+                                    qmReviewQueue[${qmReviewIndex}].correct = arr;
+                                }
+                            ">
+                            <input type="text" class="qm-input" style="flex:1;" placeholder="Option text" value="${opt.replace(/"/g, '&quot;')}" oninput="qmReviewQueue[${qmReviewIndex}].options[${oi}] = this.value">
+                            <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmReviewQueue[${qmReviewIndex}].options.splice(${oi},1); qmRenderReviewUI()">X</button>
+                        </div>
+                    `;
+                });
+                specificHtml = `
+                    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Options & Correct Answer</div>
+                    ${optsHtml}
+                    <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmReviewQueue[${qmReviewIndex}].options.push(''); qmRenderReviewUI()">+ Add Option</button>
+                `;
+            } else if (q.type === 'matching') {
+                const pairs = q.pairs || [];
+                let pairsHtml = '';
+                pairs.forEach((p, pi) => {
+                    pairsHtml += `
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <input type="text" class="qm-input" style="flex:1;" placeholder="Left side" value="${(p.left||'').replace(/"/g, '&quot;')}" oninput="qmReviewQueue[${qmReviewIndex}].pairs[${pi}].left = this.value">
+                            <input type="text" class="qm-input" style="flex:1;" placeholder="Right match" value="${(p.right||'').replace(/"/g, '&quot;')}" oninput="qmReviewQueue[${qmReviewIndex}].pairs[${pi}].right = this.value">
+                            <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmReviewQueue[${qmReviewIndex}].pairs.splice(${pi},1); qmRenderReviewUI()">X</button>
+                        </div>
+                    `;
+                });
+                specificHtml = `
+                    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Matching Pairs</div>
+                    ${pairsHtml}
+                    <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmReviewQueue[${qmReviewIndex}].pairs.push({left:'',right:''}); qmRenderReviewUI()">+ Add Pair</button>
+                `;
+            } else if (q.type === 'truefalse') {
+                specificHtml = `
+                    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Correct Answer</div>
+                    <select class="qm-input" onchange="qmReviewQueue[${qmReviewIndex}].correct = (this.value === 'true')">
+                        <option value="true" ${q.correct?'selected':''}>True</option>
+                        <option value="false" ${!q.correct?'selected':''}>False</option>
+                    </select>
+                `;
+            } else {
+                const ansArr = Array.isArray(q.answer) ? q.answer : (q.answer !== undefined && q.answer !== '' ? [q.answer] : []);
+                const isNum = q.type === 'number';
+                let ansHtml = '';
+                ansArr.forEach((a, ai) => {
+                    ansHtml += `
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <input type="${isNum ? 'number' : 'text'}" class="qm-input" style="flex:1;" placeholder="Accepted Answer" value="${typeof a === 'string' ? a.replace(/"/g, '&quot;') : a}" oninput="qmReviewQueue[${qmReviewIndex}].answer[${ai}] = ${isNum ? 'parseFloat(this.value)||0' : 'this.value'}">
+                            <button class="qm-btn" style="background:#cc0000; padding:2px 8px;" onclick="qmReviewQueue[${qmReviewIndex}].answer.splice(${ai},1); qmRenderReviewUI()">X</button>
+                        </div>
+                    `;
+                });
+                specificHtml = `
+                    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">Valid / Accepted Answers</div>
+                    ${ansHtml}
+                    <button class="qm-btn" style="margin-top:5px; font-size:12px;" onclick="qmReviewQueue[${qmReviewIndex}].answer.push(${isNum?'0':'\'\''}); qmRenderReviewUI()">+ Add Answer</button>
+                `;
+                if (q.type === 'fill') {
+                    const txt = q.text || '';
+                    const bi = q.blankIndex !== undefined ? q.blankIndex : txt.length;
+                    const preview = txt.substring(0, bi) + " [___] " + txt.substring(bi);
+                    specificHtml = `
+                        <div style="color:#00ffcc; margin-top:5px; margin-bottom:5px; font-size:14px; font-weight:bold;">Preview: ${preview.replace(/</g, '&lt;')}</div>
+                        <button class="qm-btn" style="background:#ffaa00; margin-bottom:10px;" onclick="const el=document.getElementById('qm-review-qtext'); qmReviewQueue[${qmReviewIndex}].blankIndex=el.selectionStart; qmRenderReviewUI()">Set Blank Position to Cursor</button>
+                    ` + specificHtml;
+                }
+            }
+            
+            container.innerHTML = `
+                ${qTypeHtml}<br><br>
+                <input type="text" id="qm-review-qtext" class="qm-input" style="width:100%; margin-bottom:5px;" placeholder="Question Text" value="${(q.text||'').replace(/"/g, '&quot;')}" oninput="qmReviewQueue[${qmReviewIndex}].text = this.value">
+                <textarea class="qm-input" style="width:100%; height:40px; margin-bottom:5px;" placeholder="Description (Markdown)" oninput="qmReviewQueue[${qmReviewIndex}].description = this.value">${(q.description||'').replace(/</g, '&lt;')}</textarea>
+                ${specificHtml}
+            `;
+        };
+
+        window.qmShowReviewDialog = function() {
+            if (qmReviewIndex >= qmReviewQueue.length) {
+                qmEditState.questions.push(...qmReviewQueue.filter(q => !q.discarded));
+                qmRenderEditorQuestions();
+                document.getElementById('qm-review-dialog').style.display = 'none';
+                qmAlert("Draft quiz generation complete!");
+                return;
+            }
+            document.getElementById('qm-review-progress').innerText = `(${qmReviewIndex + 1}/${qmReviewQueue.length})`;
+            qmRenderReviewUI();
+            document.getElementById('qm-review-dialog').style.display = 'block';
+        };
+
+        window.qmReviewDiscard = function() {
+            qmReviewQueue[qmReviewIndex].discarded = true;
+            qmReviewIndex++;
+            qmShowReviewDialog();
+        };
+
+        window.qmReviewKeep = function() {
+            qmReviewIndex++;
+            qmShowReviewDialog();
+        };
+
+        window.qmSaveQuiz = async function() {
+            qmEditState.title = document.getElementById('qm-edit-title').value.trim();
+            qmEditState.description = document.getElementById('qm-edit-desc').value.trim();
+            qmEditState.difficulty = document.getElementById('qm-edit-diff').value;
+            qmEditState.tags = document.getElementById('qm-edit-tags').value.split(',').map(s=>s.trim()).filter(s=>s);
+            qmEditState.partialCreditEnabled = document.getElementById('qm-edit-partial').checked;
+            qmEditState.requireLogin = document.getElementById('qm-edit-reqlog').checked;
+            qmEditState.showCorrectAnswersForIncorrect = document.getElementById('qm-edit-showcorr').checked;
+            qmEditState.showQuestionResults = document.getElementById('qm-edit-showres').checked;
+            
+            const eventsList = ['quiz_created', 'quiz_updated', 'quiz_deleted', 'quiz_submission', 'quiz_rating'];
+            const whEvents = {};
+            const whUrls = {};
+            let hasWh = false;
+            eventsList.forEach(ev => {
+                const cb = document.getElementById('qm-wh-cb-' + ev).checked;
+                const url = document.getElementById('qm-wh-url-' + ev).value.trim();
+                if (cb || url) {
+                    hasWh = true;
+                    whEvents[ev] = cb;
+                    if (url) whUrls[ev] = url;
+                }
+            });
+            qmEditState.webhooks = hasWh ? { events: whEvents, eventUrls: whUrls } : null;
+
+            if (!qmEditState.title) { qmAlert("Title is required."); return; }
+            if (qmEditState.questions.length === 0) { qmAlert("At least one question is required."); return; }
+
+            qmSetLoading(true);
+            try {
+                const url = QM_API + '/quizzes' + (qmEditState.id ? '/' + qmEditState.id : '');
+                const method = qmEditState.id ? 'PUT' : 'POST';
+                const payload = { ...qmEditState };
+                delete payload.id;
+                delete payload.owner;
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + qmToken },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text);
+                }
+                qmAlert("Quiz saved successfully!");
+                qmFetchQuizzes();
+                qmShowView('list');
+            } catch(e) {
+                console.error(e);
+                qmAlert("Failed to save quiz: " + e.message);
+            }
+            qmSetLoading(false);
         }
 
         window.addEventListener('resize', () => {
