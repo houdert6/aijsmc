@@ -9918,6 +9918,10 @@ Players: ${isConnected ? Array.from(networkEntities.values()).filter(m=>m.type==
                 const res = await fetch(QM_API + '/quizzes/' + id);
                 qmCurrentQuiz = await res.json();
                 
+                if (qmCurrentQuiz && qmCurrentQuiz.questions) {
+                    qmCurrentQuiz.questions.forEach(q => { if (!q.type) q.type = 'multiple'; });
+                }
+                
                 document.getElementById('qm-detail-title').innerText = qmCurrentQuiz.title;
                 document.getElementById('qm-detail-meta').innerText = `Difficulty: ${qmCurrentQuiz.difficulty} | Submissions: ${qmCurrentQuiz.submissions}`;
                 document.getElementById('qm-detail-desc').innerHTML = marked.parse(qmCurrentQuiz.description || '');
@@ -10260,6 +10264,11 @@ Players: ${isConnected ? Array.from(networkEntities.values()).filter(m=>m.type==
                 });
                 if (!res.ok) throw new Error("Failed to load editor");
                 qmEditState = await res.json();
+                
+                if (qmEditState && qmEditState.questions) {
+                    qmEditState.questions.forEach(q => { if (!q.type) q.type = 'multiple'; });
+                }
+                
                 qmSyncEditorForm();
                 qmShowView('editor');
             } catch(e) {
